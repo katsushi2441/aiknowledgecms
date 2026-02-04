@@ -31,6 +31,23 @@ The result is a CMS that evolves naturally alongside your learning process.
 
 ---
 
+## Core Components
+
+AIKnowledgeCMS is intentionally split into lightweight, role-specific components.
+
+- `aiknowledgecms.php`  
+  Handles CMS-level responsibilities such as data storage, structure, and presentation.
+
+- `aiknowledgecms.py`  
+  Provides AI-assisted processing for analysis, transformation, and knowledge structuring.
+
+- `news2audio.py`  
+  Converts accumulated knowledge or news sources into audio-ready scripts, enabling downstream media usage.
+
+This separation allows the system to evolve without tightly coupling knowledge storage and media execution.
+
+---
+
 ## What AIKnowledgeCMS Is NOT
 
 - Not a news aggregator
@@ -49,6 +66,8 @@ AIKnowledgeCMS prioritizes relevance, continuity, and clarity over reach.
 - Domain-focused learning archives
 - Small teams managing shared understanding
 
+The system is best suited for environments where **thinking long-term matters more than posting often**.
+
 ---
 
 ## Project Philosophy
@@ -63,12 +82,23 @@ Any outward sharing (text, audio, or social formats) should be a **byproduct**, 
 
 ---
 
+## Relationship to Other Projects
+
+AIKnowledgeCMS can function independently, but is designed to integrate naturally with other media layers such as:
+
+- AIRadio
+- Script-based audio or video generation pipelines
+
+By keeping knowledge accumulation separate from media execution, the system remains stable, reusable, and adaptable.
+
+---
+
 ## Status
 
 This project is actively used in a real environment and continues to evolve.
 
 Initial releases focus on core CMS functionality.  
-Integrations with other media layers are intentionally kept separate.
+Media-related integrations are intentionally kept modular and optional.
 
 ---
 
