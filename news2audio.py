@@ -87,10 +87,13 @@ def main():
         if audio_exists(jf):
             continue
 
-        print(f"▶ processing {jf}")
+        print(f"▶processing {jf}")
         data = load_json(jf)
 
         script = data.get("radio_script", "").strip()
+        if not script and jf.endswith("_daily_summary.json"):
+            script = data.get("summary_text", "").strip()
+
         if not script:
             print("  - skip (no script)")
             continue
@@ -99,7 +102,7 @@ def main():
 
         upload_audio(audio_url, jf)
 
-        print(f"  ✔ uploaded {jf}")
+        print(f"  ✔uploaded {jf}")
 
     print("DONE")
 

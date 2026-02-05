@@ -6,8 +6,9 @@ import requests
 # =====================
 # 設定
 # =====================
-PHP_URL = "https://aiknowledgecms.exbridge.jp/aiknowledgecms.php"
-TOKEN   = "秘密の文字列"   # PHP側と合わせる
+AIKNOWLEDGE_URL = "https://aiknowledgecms.exbridge.jp/aiknowledgecms.php"
+DAILY_SUMMARY_URL = "https://aiknowledgecms.exbridge.jp/daily_summary.php"
+TOKEN = "秘密の文字列"   # PHP側と合わせる
 
 # =====================
 # 引数処理
@@ -25,18 +26,33 @@ else:
     target_date = datetime.date.today().isoformat()
 
 # =====================
-# PHP 実行
+# 1. 各キーワード知識生成
 # =====================
-params = {
+params_knowledge = {
     "generate": "1",
     "date": target_date,
     "token": TOKEN,
 }
 
 try:
-    r = requests.get(PHP_URL, params=params, timeout=300)
+    r = requests.get(AIKNOWLEDGE_URL, params=params_knowledge, timeout=300)
     r.raise_for_status()
-    print(r.text.strip())
+    print("[OK] aiknowledgecms.php")
 except Exception as e:
-    print("ERROR:", e)
+    print("[ERROR] aiknowledgecms.php:", e)
+    exit(1)
+
+# =====================
+# 2. daily_summary 生成
+# =====================
+params_summary = {
+    "date": target_date,
+}
+
+try:
+    r = requests.get(DAILY_SUMMARY_URL, params=params_summary, timeout=300)
+    r.raise_for_status()
+    print("[OK] daily_summary.php")
+except Exception as e:
+    print("[ERROR] daily_summary.php:", e)
 

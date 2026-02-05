@@ -175,9 +175,11 @@ function fetch_google_news($keyword, $target_date = null) {
     if (!$obj || !isset($obj->channel->item)) return [];
 
     if ($target_date) {
-        $target_ts = strtotime($target_date . " 23:59:59");
+        $start_ts = strtotime($target_date . " 00:00:00");
+        $end_ts   = strtotime($target_date . " 23:59:59");
     } else {
-        $target_ts = null;
+        $start_ts = null;
+        $end_ts   = null;
     }
 
     $items = [];
@@ -186,13 +188,16 @@ function fetch_google_news($keyword, $target_date = null) {
         $pub = trim((string)$item->pubDate);
         $pub_ts = strtotime($pub);
 
-        if ($target_ts && $pub_ts > $target_ts) {
-            continue;
+        /* ★FIX: 指定日以外は完全除外 */
+        if ($start_ts !== null) {
+            if ($pub_ts < $start_ts || $pub_ts > $end_ts) {
+                continue;
+            }
         }
 
         $items[] = [
-            "title" => trim((string)$item->title),
-            "link"  => trim((string)$item->link),
+            "title"   => trim((string)$item->title),
+            "link"    => trim((string)$item->link),
             "pubDate" => $pub,
         ];
 
@@ -221,8 +226,9 @@ function build_prompt($keyword, $news_items) {
     $news_text = implode("\n", $lines);
 
     return "
-あなたはプロのラジオ構成作家です。
-以下のニュース一覧を参考に、日本語のラジオ原稿本文だけを作ってください。
+あなたはプロのリサーチャー兼ナレッジエディターです。
+以下のニュース一覧をもとに、情報を整理・統合し、
+「後から読み返しても価値がある知識レポート本文」を日本語で作成してください。
 
 # 今日の日時
 {$today}
@@ -230,13 +236,26 @@ function build_prompt($keyword, $news_items) {
 # ニュース一覧
 {$news_text}
 
+# 目的
+- ニュースを単に要約するのではなく、
+  背景・共通点・因果関係・意味を整理し、
+  知識として理解できる文章にすること
+
 # 条件
-- 尺は2〜3分、600〜900文字
-- 説明文・挨拶・見出し・URL禁止
-- 人がそのまま読む本文のみ
+- 600〜900文字
+- 見出し・箇条書き・挨拶・URLは禁止
+- 読み物として自然な文章のみ
+- 主観的な感想は入れない
+- 短期的な速報性より「再読価値」を優先する
+
+# 重視する観点
+- 何が新しいのか
+- 何が変わりつつあるのか
+- 複数ニュースに共通する流れや構造
+- 今後に影響しそうなポイント
 
 # 開始文（改変禁止）
-- {$keyword}に関するニュースです。
+- {$keyword}に関する最近の動向について整理する。
 ";
 }
 
@@ -277,6 +296,8 @@ if (isset($_GET["generate"]) && $_GET["generate"] === "1") {
     $target_date = isset($_GET["date"])
         ? $_GET["date"]
         : $today;
+
+    $view_keyword = isset($_GET["kw"]) ? $_GET["kw"] : "";
 
     foreach ($keywords as $keyword) {
 
@@ -370,7 +391,8 @@ a{color:#38bdf8}
 </style>
 </head>
 <body>
-<img src="./images/aiknowledgecms_logo.png" width="30%" height="30%">
+<img src="./images/aiknowledgecms_logo.png" width="30%" height="30%"><br>
+<?php if (isset($_GET["admin"]) && $_GET["admin"] === "0"): ?>
 <form method="post" style="margin-bottom:40px">
     <h3 style="margin-bottom:12px">Keywords</h3>
 
@@ -437,6 +459,7 @@ a{color:#38bdf8}
         </div>
     </div>
 </form>
+<?php endif; ?>
 
 <button id="playAllBtn"
   style="margin-bottom:16px;padding:10px 16px;border-radius:10px;border:0;background:#16a34a;color:#fff">
@@ -444,9 +467,21 @@ a{color:#38bdf8}
 </button>
 
 
-<?php foreach ($keywords as $keyword): ?>
+<?php
+$view_keyword = isset($_GET["kw"]) ? $_GET["kw"] : "";
+foreach ($keywords as $keyword):
+    if ($view_keyword !== "" && $view_keyword !== $keyword) {
+        continue;
+    }
+?>
+
 <div class="keyword">
-    <h2><?php echo h($keyword); ?></h2>
+<h2>
+  <a href="?kw=<?php echo h($keyword); ?>">
+    <?php echo h($keyword); ?>
+  </a>
+</h2>
+
 
     <?php
         $prev_date = date("Y-m-d", strtotime($base_date." -1 day"));
@@ -526,7 +561,7 @@ a{color:#38bdf8}
                 <hr>
                 <div class="title"><?php echo h($n["title"]); ?></div>
                 <div class="muted"><?php echo h($n["pubDate"]); ?></div>
-                <a href="<?php echo h($n["link"]); ?>" target="_blank">記事を開く</a>
+                <a href="<?php echo h($n["link"]); ?>" target="_blank">記事を開 く</a>
             <?php endforeach; ?>
         </div>
     <?php endforeach; ?>
@@ -598,4 +633,3 @@ function playAll(btn){
 </script>
 </body>
 </html>
-
