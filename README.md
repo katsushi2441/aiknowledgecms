@@ -1,72 +1,100 @@
 # AIKnowledgeCMS
 
-AIKnowledgeCMS is a self-growing CMS that automatically collects, filters, and organizes domain-specific information into a long-term knowledge base.
+AIKnowledgeCMS is a self-growing knowledge-oriented CMS that automatically collects, filters, and organizes domain-specific information into a long-term knowledge base.
 
-It is designed to accumulate **understanding**, not to publish transient content.
+Rather than publishing content, it is designed to **accumulate understanding** over time.
 
 ---
 
-## Why
+## Why AIKnowledgeCMS Exists
 
-Most CMS platforms are optimized for publishing, SEO, or frequent manual updates.
+Most CMS platforms are optimized for:
 
-AIKnowledgeCMS takes a different approach:
+- Publishing frequency
+- SEO and visibility
+- Manual content updates
 
-- Learning happens continuously
-- Knowledge should compound over time
-- Manual posting should not be required to keep a site alive
+AIKnowledgeCMS takes a different stance.
 
-This project exists to support **quiet, consistent knowledge accumulation** driven by personal or team interests.
+- Learning happens continuously, even without posting
+- Knowledge should compound, not reset daily
+- A system should stay alive without constant human input
+
+This project exists to support **quiet, consistent knowledge accumulation** driven by genuine interests, not engagement metrics.
 
 ---
 
 ## What AIKnowledgeCMS Does
 
-- Automatically collects information from predefined, trusted sources
-- Filters and categorizes content using AI-assisted logic
-- Stores information as structured knowledge rather than short-lived posts
-- Grows continuously without manual content creation
+AIKnowledgeCMS operates as an autonomous knowledge loop:
 
-The result is a CMS that evolves naturally alongside your learning process.
+- Collects information from predefined, trusted sources
+- Filters and analyzes content using AI-assisted logic
+- Stores results as structured, date-based knowledge JSON
+- Accumulates insight incrementally, day by day
+
+The system grows naturally alongside your thinking, research, or observation process.
+
+---
+
+## How It Works (Conceptual Flow)
+
+1. External information is collected per topic or keyword  
+2. Each item is analyzed and stored as structured knowledge  
+3. Daily knowledge is optionally summarized  
+4. Knowledge remains accessible, searchable, and reusable  
+
+Nothing is overwritten.  
+Nothing is optimized for trends.  
+Everything compounds.
 
 ---
 
 ## Core Components
 
-AIKnowledgeCMS is intentionally split into lightweight, role-specific components.
+AIKnowledgeCMS is intentionally split into small, role-specific components.
 
 - `aiknowledgecms.php`  
-  Handles CMS-level responsibilities such as data storage, structure, and presentation.
+  Handles CMS-level responsibilities such as:
+  - Data storage
+  - Daily views
+  - Keyword navigation
+  - Manual edits when needed
 
 - `aiknowledgecms.py`  
-  Provides AI-assisted processing for analysis, transformation, and knowledge structuring.
+  Performs AI-assisted processing, including:
+  - Content analysis
+  - Knowledge extraction
+  - Structured JSON generation
 
 - `news2audio.py`  
-  Converts accumulated knowledge or news sources into audio-ready scripts, enabling downstream media usage.
+  Converts accumulated knowledge into audio-ready scripts, enabling optional downstream use such as narration or radio-style output.
 
-This separation allows the system to evolve without tightly coupling knowledge storage and media execution.
+This separation keeps knowledge accumulation stable while allowing media-related extensions to evolve independently.
 
 ---
 
 ## What AIKnowledgeCMS Is NOT
 
 - Not a news aggregator
-- Not an AI content generator for SEO
+- Not an SEO-focused content generator
 - Not a social media automation tool
-- Not designed for virality or content volume
+- Not designed for virality or volume
 
-AIKnowledgeCMS prioritizes relevance, continuity, and clarity over reach.
+AIKnowledgeCMS values **relevance, continuity, and clarity** over reach.
 
 ---
 
 ## Intended Use Cases
 
+AIKnowledgeCMS is suited for:
+
 - Personal knowledge bases
 - Long-term research tracking
 - Domain-focused learning archives
-- Small teams managing shared understanding
+- Small teams sharing accumulated understanding
 
-The system is best suited for environments where **thinking long-term matters more than posting often**.
+It works best where **thinking long-term matters more than posting often**.
 
 ---
 
@@ -78,27 +106,31 @@ AIKnowledgeCMS follows a simple order:
 2. Organize what matters  
 3. Let knowledge accumulate naturally  
 
-Any outward sharing (text, audio, or social formats) should be a **byproduct**, not the goal.
+Any outward expression (articles, audio, summaries, media) should be a **byproduct**, not the objective.
 
 ---
 
 ## Relationship to Other Projects
 
-AIKnowledgeCMS can function independently, but is designed to integrate naturally with other media layers such as:
+AIKnowledgeCMS can function independently, but is designed to integrate cleanly with external systems such as:
 
 - AIRadio
 - Script-based audio or video generation pipelines
+- Other AI-driven media layers
 
-By keeping knowledge accumulation separate from media execution, the system remains stable, reusable, and adaptable.
+By separating knowledge storage from media execution, the system remains reusable, extensible, and resilient.
 
 ---
 
 ## Status
 
-This project is actively used in a real environment and continues to evolve.
+This project is actively used in a real production environment and continues to evolve.
 
-Initial releases focus on core CMS functionality.  
-Media-related integrations are intentionally kept modular and optional.
+Current development focuses on:
+- Stability of daily knowledge accumulation
+- Clear separation between knowledge and media layers
+
+Media-related features remain modular and optional by design.
 
 ---
 

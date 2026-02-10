@@ -1,205 +1,366 @@
 <?php
 date_default_timezone_set("Asia/Tokyo");
 
-/* =====================
-   設定・定数
-===================== */
-define("OLLAMA_URL", "https://exbridge.ddns.net/api/generate");
-define("OLLAMA_MODEL", "gemma3:12b");
+/* ★ FastAPI 版 getkeyword */
+define("KEYWORD_SEED_API", "http://exbridge.ddns.net:8003/getkeyword");
+define("NEWS_ANALYSIS_API", "http://exbridge.ddns.net:8003/news_analysis");
+
+define("DATA_DIR", __DIR__ . "/data");
+define("KEYWORD_JSON", __DIR__ . "/keyword.json");
 define("NEWS_LIMIT", 5);
+define("AIKNOWLEDGE_TOKEN", "秘密の文字列");
 
-$keyword_file = __DIR__ . "/keyword.txt";
-$data_dir     = __DIR__ . "/data";
+/* =========================================================
+   API : JSON GENERATION (for worker)
+========================================================= */
+if (isset($_POST["api_seed"])) {
 
-if (!file_exists($data_dir)) {
-    mkdir($data_dir, 0755, true);
-}
-if (!file_exists($keyword_file)) {
-    echo "keyword.txt not found";
-    exit;
-}
-
-/* ★FIX: 日付は「日」基準で統一（ファイル名・比較用） */
-$today = date("Y-m-d");
-
-/* ★FIX: 基準日（base_date） */
-$base_date = $today;
-if (isset($_GET["base_date"])) {
-    if (preg_match("/^\d{4}-\d{2}-\d{2}$/", $_GET["base_date"])) {
-        $base_date = $_GET["base_date"];
-    }
-}
-
-/* =====================
-   JSON list API
-===================== */
-if (isset($_GET["list_json"]) && $_GET["list_json"] === "1") {
-
-    if (!isset($_GET["token"]) || $_GET["token"] !== "秘密の文字列") {
-        http_response_code(403);
-        exit;
-    }
-
-    $files = glob($data_dir . "/*.json");
-    if ($files === false) {
-        echo json_encode([]);
-        exit;
-    }
-
-    $list = [];
-    foreach ($files as $f) {
-        $list[] = basename($f);
-    }
-
-    sort($list);
-
-    header("Content-Type: application/json; charset=UTF-8");
-    echo json_encode($list, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    exit;
-}
-
-if (isset($_GET["upload_audio"]) && $_GET["upload_audio"] === "1") {
-
-    if (!isset($_GET["token"]) || $_GET["token"] !== "秘密の文字列") {
-        http_response_code(403);
-        exit;
-    }
-
-    $raw = file_get_contents("php://input");
-    $req = json_decode($raw, true);
+    header("Content-Type: application/json; charset=utf-8");
 
     if (
-        !is_array($req) ||
-        empty($req["audio_url"]) ||
-        empty($req["json_file"])
+        !isset($_POST["token"]) ||
+        $_POST["token"] !== AIKNOWLEDGE_TOKEN
     ) {
-        http_response_code(400);
+        echo json_encode(array("status"=>"fail","reason"=>"invalid token"));
         exit;
     }
 
-    $json_file = basename($req["json_file"]);
-    $audio_url = $req["audio_url"];
-
-    $base = pathinfo($json_file, PATHINFO_FILENAME);
-    $audio_name = $base . ".wav";
-    $audio_path = $data_dir . "/" . $audio_name;
-
-    $json_path = $data_dir . "/" . $json_file;
-    if (!file_exists($json_path)) {
-        http_response_code(404);
+    $base = isset($_POST["keyword"]) ? trim($_POST["keyword"]) : "";
+    if ($base === "") {
+        echo json_encode(array("status"=>"fail","reason"=>"empty keyword"));
         exit;
     }
 
-    $ch = curl_init($audio_url);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 120,
-        CURLOPT_FOLLOWLOCATION => true,
-    ]);
-    $audio_bin = curl_exec($ch);
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    $result = seed_keyword_core($base, "worker");
 
-    if ($audio_bin === false || $status !== 200) {
-        http_response_code(502);
-        exit;
-    }
-
-    if (strlen($audio_bin) > 20 * 1024 * 1024) {
-        http_response_code(413);
-        exit;
-    }
-
-    file_put_contents($audio_path, $audio_bin);
-
-    $data = json_decode(file_get_contents($json_path), true);
-    if (!is_array($data)) {
-        http_response_code(500);
-        exit;
-    }
-
-    $data["audio_file"] = $audio_name;
-    $data["audio_generated_at"] = date("Y-m-d H:i:s");
-
-    file_put_contents(
-        $json_path,
-        json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+    echo json_encode(
+        array(
+            "status" => "ok",
+            "base"   => $base,
+            "added"  => isset($result["added"]) ? $result["added"] : array()
+        ),
+        JSON_UNESCAPED_UNICODE
     );
-
-    echo "OK";
     exit;
 }
 
-/* =====================
-   Utility
-===================== */
-function h($s) {
+/* =========================================================
+   CONFIG
+========================================================= */
+
+if (!file_exists(DATA_DIR)) {
+    mkdir(DATA_DIR, 0755, true);
+}
+
+function seed_keyword_core($base, $mode = "browser", $depth = 0, &$state = null){
+
+    if ($state === null) {
+
+        $data = load_keyword_json_safe();
+
+        $state = array(
+            "keywords"     => $data["keywords"],
+            "created"      => $data["created"],
+            "counts"       => isset($data["counts"]) ? $data["counts"] : array(),
+            "added"        => array(),
+            "tried_seeds"  => array(),
+            "tried_map"    => array(),
+            "today"        => date("Y-m-d")
+        );
+    }
+
+    if ($depth > 0) {
+        return array(
+            "added" => $state["added"],
+            "tried_seeds" => $state["tried_seeds"]
+        );
+    }
+
+    /* ★ この base が生んだ数だけを数える */
+    $base_added_count = 0;
+
+    /* ===== base 処理 ===== */
+    if (!isset($state["tried_map"][$base])) {
+
+        $state["tried_map"][$base] = true;
+
+        $base_news = fetch_google_news($base, $state["today"]);
+        if ($base_news) {
+
+            if (!in_array($base, $state["keywords"], true)) {
+                $state["keywords"][] = $base;
+                $state["created"][$base] = $state["today"];
+                if (!isset($state["counts"][$base])) {
+                    $state["counts"][$base] = 0;
+                }
+                generate_daily_json_on_seed($base, $state["today"]);
+                $state["added"][] = $base;
+            }
+        } else {
+            $state["tried_seeds"][] = $base;
+        }
+    }
+
+    /* ===== 派生キーワード取得（FastAPI）===== */
+    $res = http_post_json(
+        KEYWORD_SEED_API,
+        array(
+            "keyword"   => $base,
+            "max_seeds" => 10
+        )
+    );
+
+    if (
+        !is_array($res) ||
+        !isset($res["results"]) ||
+        !is_array($res["results"])
+    ) {
+        goto SAVE_AND_RETURN;
+    }
+
+    $seeds = array();
+
+    foreach ($res["results"] as $row) {
+        if (isset($row["keyword"]) && is_string($row["keyword"])) {
+            $seeds[] = $row["keyword"];
+        }
+    }
+
+    $seeds = array_values(array_unique($seeds));
+
+    if ($mode === "browser") {
+        goto SAVE_AND_RETURN;
+    }
+
+    shuffle($seeds);
+
+    foreach ($seeds as $s) {
+
+        if (count($state["added"]) >= 10) break;
+        if (isset($state["tried_map"][$s])) continue;
+
+        /* ★ この base 由来で新規追加されたかだけを見る */
+        if (!in_array($s, $state["keywords"], true)) {
+
+            $state["keywords"][] = $s;
+            $state["created"][$s] = $state["today"];
+            if (!isset($state["counts"][$s])) {
+                $state["counts"][$s] = 0;
+            }
+
+            generate_daily_json_on_seed($s, $state["today"]);
+
+            $state["added"][] = $s;
+            $base_added_count++;
+        }
+
+        seed_keyword_core($s, $mode, $depth + 1, $state);
+    }
+
+SAVE_AND_RETURN:
+
+    /* ★ base が生んだ数をここで確定 */
+    $state["counts"][$base] = $base_added_count;
+
+    file_put_contents(
+        KEYWORD_JSON,
+        json_encode(
+            array(
+                "keywords" => array_values(array_unique($state["keywords"])),
+                "created"  => $state["created"],
+                "counts"   => $state["counts"]
+            ),
+            JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+        )
+    );
+
+    return array(
+        "added" => array_values(array_unique($state["added"])),
+        "tried_seeds" => array_values(array_unique($state["tried_seeds"]))
+    );
+}
+
+
+
+
+
+
+
+
+
+
+/* =========================================================
+   UTILITY
+========================================================= */
+function load_keyword_json_safe(){
+
+    if (!file_exists(KEYWORD_JSON)) {
+        return array(
+            "keywords" => array(),
+            "created"  => array(),
+            "counts"   => array()
+        );
+    }
+
+    $json = json_decode(file_get_contents(KEYWORD_JSON), true);
+
+    if (!is_array($json)) {
+        return array(
+            "keywords" => array(),
+            "created"  => array(),
+            "counts"   => array()
+        );
+    }
+
+    if (!isset($json["keywords"]) || !is_array($json["keywords"])) {
+        $json["keywords"] = array();
+    }
+
+    if (!isset($json["created"]) || !is_array($json["created"])) {
+        $json["created"] = array();
+    }
+
+    if (!isset($json["counts"]) || !is_array($json["counts"])) {
+        $json["counts"] = array();
+    }
+
+    return $json;
+}
+
+function count_today_created($created, $today){
+
+    $count = 0;
+
+    foreach ($created as $d) {
+        if ($d === $today) {
+            $count++;
+        }
+    }
+
+    return $count;
+}
+
+function limit_seed_keywords($seeds, $limit = 2){
+
+    if (!is_array($seeds)) {
+        return array();
+    }
+
+    return array_slice($seeds, 0, $limit);
+}
+
+
+function h($s){
     return htmlspecialchars($s, ENT_QUOTES, "UTF-8");
 }
 
-function http_post_json($url, $payload, $timeout = 120) {
+function http_post_json($url, $payload, $timeout = 180){
+
     $ch = curl_init($url);
-    $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
-    curl_setopt_array($ch, [
+
+    curl_setopt_array($ch, array(
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => $timeout,
         CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $json,
-        CURLOPT_HTTPHEADER => [
-            "Content-Type: application/json",
-        ],
-    ]);
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
+        CURLOPT_HTTPHEADER => array(
+            "Content-Type: application/json"
+        ),
+    ));
+
     $res = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($res === false) return [false, null];
-    $data = json_decode($res, true);
-    return [($code >= 200 && $code < 300), $data];
+    if ($res === false) return null;
+
+    return json_decode($res, true);
 }
 
-/* =====================
-   Google News
-===================== */
-function fetch_google_news($keyword, $target_date = null) {
+function generate_daily_json_on_seed($keyword, $date){
+
+    $json_file = DATA_DIR . "/" . $date . "_" . $keyword . ".json";
+
+    if (file_exists($json_file)) {
+        $old = json_decode(file_get_contents($json_file), true);
+        if (
+            is_array($old) &&
+            isset($old["analysis"]) &&
+            trim($old["analysis"]) !== ""
+        ) {
+            return true;
+        }
+    }
+
+    $news = fetch_google_news($keyword, $date);
+    if (!$news) {
+        return false;
+    }
+
+    $analysis_res = http_post_json(
+        NEWS_ANALYSIS_API,
+        array(
+            "keyword" => $keyword,
+            "news"    => $news
+        )
+    );
+
+    $analysis_text = "";
+    if (
+        is_array($analysis_res) &&
+        isset($analysis_res["analysis"]) &&
+        is_string($analysis_res["analysis"])
+    ) {
+        $analysis_text = $analysis_res["analysis"];
+    }
+
+
+    return (bool)file_put_contents(
+        $json_file,
+        json_encode(
+            array(
+                "date"         => $date,
+                "keyword"      => $keyword,
+                "generated_at" => date("Y-m-d H:i:s"),
+                "analysis"     => $analysis_text,
+                "news"         => $news
+            ),
+            JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+        )
+    );
+}
+
+
+/* =========================================================
+   GOOGLE NEWS (TODAY ONLY)
+========================================================= */
+function fetch_google_news($keyword, $date){
 
     $rss = "https://news.google.com/rss/search?q="
          . urlencode($keyword)
          . "&hl=ja&gl=JP&ceid=JP:ja";
 
     $xml = @file_get_contents($rss);
-    if ($xml === false) return [];
+    if ($xml === false) return array();
 
     libxml_use_internal_errors(true);
     $obj = simplexml_load_string($xml);
-    if (!$obj || !isset($obj->channel->item)) return [];
+    if (!$obj || !isset($obj->channel->item)) return array();
 
-    if ($target_date) {
-        $start_ts = strtotime($target_date . " 00:00:00");
-        $end_ts   = strtotime($target_date . " 23:59:59");
-    } else {
-        $start_ts = null;
-        $end_ts   = null;
-    }
+    $start = strtotime($date . " 00:00:00");
+    $end   = strtotime($date . " 23:59:59");
 
-    $items = [];
+    $items = array();
+
     foreach ($obj->channel->item as $item) {
 
-        $pub = trim((string)$item->pubDate);
-        $pub_ts = strtotime($pub);
+        $pub = strtotime((string)$item->pubDate);
+        if ($pub < $start || $pub > $end) continue;
 
-        /* ★FIX: 指定日以外は完全除外 */
-        if ($start_ts !== null) {
-            if ($pub_ts < $start_ts || $pub_ts > $end_ts) {
-                continue;
-            }
-        }
-
-        $items[] = [
+        $items[] = array(
             "title"   => trim((string)$item->title),
             "link"    => trim((string)$item->link),
-            "pubDate" => $pub,
-        ];
+            "pubDate" => trim((string)$item->pubDate)
+        );
 
         if (count($items) >= NEWS_LIMIT) break;
     }
@@ -207,429 +368,261 @@ function fetch_google_news($keyword, $target_date = null) {
     return $items;
 }
 
-/* =====================
-   Prompt / Ollama
-===================== */
-function build_prompt($keyword, $news_items) {
+/* =========================================================
+   LOAD KEYWORDS
+========================================================= */
+$data = load_keyword_json_safe();
 
-    /* ★FIX: グローバルの $today を明示 */
-    global $today;
+$keywords = $data["keywords"];
+$created  = $data["created"];
 
-    $lines = [];
-    $i = 1;
-    foreach ($news_items as $n) {
-        $lines[] = $i.". ".$n["title"]." (".$n["pubDate"].")";
-        $lines[] = "   ".$n["link"];
-        $i++;
-    }
-
-    $news_text = implode("\n", $lines);
-
-    return "
-あなたはプロのリサーチャー兼ナレッジエディターです。
-以下のニュース一覧をもとに、情報を整理・統合し、
-「後から読み返しても価値がある知識レポート本文」を日本語で作成してください。
-
-# 今日の日時
-{$today}
-
-# ニュース一覧
-{$news_text}
-
-# 目的
-- ニュースを単に要約するのではなく、
-  背景・共通点・因果関係・意味を整理し、
-  知識として理解できる文章にすること
-
-# 条件
-- 600〜900文字
-- 見出し・箇条書き・挨拶・URLは禁止
-- 読み物として自然な文章のみ
-- 主観的な感想は入れない
-- 短期的な速報性より「再読価値」を優先する
-
-# 重視する観点
-- 何が新しいのか
-- 何が変わりつつあるのか
-- 複数ニュースに共通する流れや構造
-- 今後に影響しそうなポイント
-
-# 開始文（改変禁止）
-- {$keyword}に関する最近の動向について整理する。
-";
+$keyword_set = array();
+foreach ($keywords as $k) {
+    $keyword_set[$k] = true;
 }
 
-function ollama_generate_script($prompt) {
+/* =========================================================
+   POST : SEED KEYWORD
+========================================================= */
+$today = date("Y-m-d");
 
-    $payload = [
-        "model" => OLLAMA_MODEL,
-        "prompt" => $prompt,
-        "stream" => false,
-        "options" => [
-            "temperature" => 0.7,
-        ],
-    ];
-
-    list($ok, $data) = http_post_json(OLLAMA_URL, $payload);
-    if (!$ok || !isset($data["response"])) return "";
-    return trim($data["response"]);
+$base_date = $today;
+if (isset($_GET["base_date"]) && preg_match("/^\d{4}-\d{2}-\d{2}$/", $_GET["base_date"])) {
+    $base_date = $_GET["base_date"];
 }
 
-/* =====================
-   キーワード読込
-===================== */
-$keywords = file(
-    $keyword_file,
-    FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES
-);
+if (isset($_POST["seed_keyword"])) {
 
-/* =====================
-   API / cron 用 生成モード
-===================== */
-if (isset($_GET["generate"]) && $_GET["generate"] === "1") {
-
-    if (!isset($_GET["token"]) || $_GET["token"] !== "秘密の文字列") {
-        http_response_code(403);
-        exit;
+    $base = trim($_POST["seed_keyword"]);
+    if ($base !== "") {
+        seed_keyword_core($base);
     }
 
-    $target_date = isset($_GET["date"])
-        ? $_GET["date"]
-        : $today;
-
-    $view_keyword = isset($_GET["kw"]) ? $_GET["kw"] : "";
-
-    foreach ($keywords as $keyword) {
-
-        $json_file = $data_dir . "/" . $target_date . "_" . $keyword . ".json";
-        if (file_exists($json_file)) continue;
-
-        $news = fetch_google_news($keyword, $target_date);
-        if (!$news) continue;
-
-        $script = ollama_generate_script(
-            build_prompt($keyword, $news)
-        );
-
-        file_put_contents(
-            $json_file,
-            json_encode([
-                "date" => $target_date,
-                "keyword" => $keyword,
-                "generated_at" => date("Y-m-d H:i:s"),
-                "radio_script" => $script,
-                "news" => $news,
-            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-        );
-    }
-
-    echo "OK";
+    header("Location: ?kw=" . urlencode($base));
     exit;
 }
 
-/* =====================
-   台本保存処理
-===================== */
-if (isset($_POST["save_script"])) {
+/* =========================================================
+   VIEW KEYWORD (GET)
+========================================================= */
+$view_keyword = "";
+if (isset($_GET["kw"])) {
+    $view_keyword = trim($_GET["kw"]);
+}
 
-    $file = basename($_POST["json_file"]);
-    $script = isset($_POST["radio_script"])
-        ? trim($_POST["radio_script"])
-        : "";
+/* =========================================================
+   JSON GENERATION
+========================================================= */
 
-    $path = $data_dir . "/" . $file;
+$results = array();
 
-    if ($file !== "" && file_exists($path)) {
-        $data = json_decode(file_get_contents($path), true);
-        if (is_array($data)) {
-            $data["radio_script"] = $script;
-            $data["edited_at"] = date("Y-m-d H:i:s");
 
-            file_put_contents(
-                $path,
-                json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-            );
+foreach ($keywords as $kw) {
+
+    if ($view_keyword !== "" && $kw !== $view_keyword) continue;
+
+    $results[$kw] = array();
+
+    for ($i = 0; $i < 10; $i++) {
+
+        $d = date("Y-m-d", strtotime($base_date . " -".$i." day"));
+
+        $json_file = DATA_DIR . "/" . $d . "_" . $kw . ".json";
+
+        if (file_exists($json_file)) {
+            $results[$kw][] = $json_file;
         }
     }
 }
-
-/* =====================
-   キーワード保存処理
-===================== */
-if (isset($_POST["save_keywords"])) {
-
-    if (isset($_POST["keywords_text"])) {
-
-        $text = str_replace("\r\n", "\n", $_POST["keywords_text"]);
-        $text = trim($text);
-
-        if ($text !== "") {
-            file_put_contents($keyword_file, $text . "\n");
-        }
-    }
-}
-
 ?>
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-body{background:#020617;color:#e5e7eb;font-family:sans-serif;padding:16px}
-.keyword{margin-bottom:40px}
-.scroll{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory}
-.card{min-width:420px;background:#111827;padding:14px;border-radius:12px;scroll-snap-align:start}
-@media(max-width:600px){.card{min-width:100%}}
-textarea{width:100%;height:220px;background:#020617;color:#e5e7eb;border:1px solid #334155;border-radius:10px;padding:10px}
-button{margin-top:8px;padding:8px 14px;border-radius:10px;border:0;background:#2563eb;color:#fff}
-.playall{background:#16a34a;margin-bottom:12px}
-.date{font-size:12px;color:#94a3b8;margin-bottom:6px}
-.title{font-weight:700}
-.muted{font-size:13px;color:#94a3b8}
-a{color:#38bdf8}
+body{
+    background:#020617;
+    color:#e5e7eb;
+    font-family:sans-serif;
+    padding:16px
+}
+.keyword{
+    margin-bottom:40px
+}
+.scroll{
+    display:flex;
+    gap:12px;
+    overflow-x:auto;
+    scroll-snap-type:x mandatory;
+    flex-wrap:nowrap;
+}
+
+.card{
+    width:420px;
+    flex:0 0 420px;
+    background:#111827;
+    padding:14px;
+    border-radius:12px;
+    scroll-snap-align:start;
+}
+
+@media(max-width:600px){
+    .card{
+        min-width:100%;
+    }
+}
+textarea{
+    width:100%;
+    height:220px;
+    background:#020617;
+    color:#e5e7eb;
+    border:1px solid #334155;
+    border-radius:10px;
+    padding:10px
+}
+.title{
+    font-weight:700
+}
+.muted{
+    font-size:13px;
+    color:#94a3b8
+}
+a{
+    color:#38bdf8
+}
+
+/* Thinking Overlay */
+#thinking-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(2,6,23,0.85);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:9999
+}
+#thinking-box{
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:14px;
+    padding:24px 32px;
+    text-align:center
+}
+#thinking-title{
+    font-size:18px;
+    font-weight:700;
+    margin-bottom:8px
+}
+#thinking-sub{
+    font-size:13px;
+    color:#94a3b8
+}
 </style>
+
 </head>
 <body>
-<img src="./images/aiknowledgecms_logo.png" width="30%" height="30%"><br>
-<?php if (isset($_GET["admin"]) && $_GET["admin"] === "0"): ?>
-<form method="post" style="margin-bottom:40px">
-    <h3 style="margin-bottom:12px">Keywords</h3>
 
-    <div style="
-        display:flex;
-        gap:16px;
-        align-items:stretch;
-        background:#020617;
-        border:1px solid #334155;
-        border-radius:14px;
-        padding:16px;
-    ">
-        <textarea
-            name="keywords_text"
-            style="
-                width:200px;
-                height:40px;
-                background:#020617;
-                color:#e5e7eb;
-                border:1px solid #334155;
-                border-radius:10px;
-                padding:8px;
-                font-family:monospace;
-                resize:vertical;
-            "
-        ><?php echo h(file_get_contents($keyword_file)); ?></textarea>
+<a href="./aiknowledgecms.php"><img src="./images/aiknowledgecms_logo.png" width="30%"></a><br><br>
 
-        <div style="
-            display:flex;
-            gap:6px;
-            align-items:center;
-        ">
-            <button
-                type="submit"
-                name="save_keywords"
-                value="1"
-                style="
-                    padding:4px 10px;
-                    font-size:12px;
-                    border-radius:6px;
-                    border:1px solid #2563eb;
-                    background:#2563eb;
-                    color:#fff;
-                "
-            >
-                保存
-            </button>
-
-            <button
-                type="button"
-                onclick="location.href = location.pathname"
-                style="
-                    padding:4px 10px;
-                    font-size:12px;
-                    border-radius:6px;
-                    border:1px solid #334155;
-                    background:#020617;
-                    color:#e5e7eb;
-                    background:#2563eb;
-                "
-            >
-                再表
-            </button>
-        </div>
-    </div>
-</form>
-<?php endif; ?>
-
-<button id="playAllBtn"
-  style="margin-bottom:16px;padding:10px 16px;border-radius:10px;border:0;background:#16a34a;color:#fff">
-▶ 全部再生
-</button>
-
-
-<?php
-$view_keyword = isset($_GET["kw"]) ? $_GET["kw"] : "";
-foreach ($keywords as $keyword):
-    if ($view_keyword !== "" && $view_keyword !== $keyword) {
-        continue;
-    }
-?>
-
-<div class="keyword">
-<h2>
-  <a href="?kw=<?php echo h($keyword); ?>">
-    <?php echo h($keyword); ?>
-  </a>
-</h2>
-
-
-    <?php
-        $prev_date = date("Y-m-d", strtotime($base_date." -1 day"));
-        $next_date = date("Y-m-d", strtotime($base_date." +1 day"));
-        $can_next  = ($next_date <= $today);
-    ?>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-        <a href="?base_date=<?php echo h($prev_date); ?>">←</a>
-        <span><?php echo h($base_date); ?></span>
-        <?php if ($can_next): ?>
-            <a href="?base_date=<?php echo h($next_date); ?>">→</a>
-        <?php else: ?>
-            <span style="opacity:.3">→</span>
-        <?php endif; ?>
-    </div>
-
-    <button class="playall" onclick="playAll(this)">
-        ▶ このキーワードを一括再生
-    </button>
-
-    <div class="scroll">
-    <?php
-        $today_file = $data_dir."/".$today."_".$keyword.".json";
-
-        if (!file_exists($today_file)) {
-            $news = fetch_google_news($keyword, $today);
-            $script = ollama_generate_script(
-                build_prompt($keyword, $news)
-            );
-
-            file_put_contents(
-                $today_file,
-                json_encode([
-                    "date"=>$today,
-                    "keyword"=>$keyword,
-                    "generated_at"=>date("Y-m-d H:i:s"),
-                    "radio_script"=>$script,
-                    "news"=>$news
-                ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
-            );
-        }
-
-        $files = glob($data_dir."/*_".$keyword.".json");
-        rsort($files);
-
-        $filtered = [];
-        foreach ($files as $f) {
-            if (preg_match("/(\d{4}-\d{2}-\d{2})_".preg_quote($keyword,"/")."\.json$/", $f, $m)) {
-                if ($m[1] <= $base_date) {
-                    $filtered[] = $f;
-                }
-            }
-        }
-
-        $files = array_slice($filtered, 0, 10);
-
-        foreach ($files as $file):
-            $data = json_decode(file_get_contents($file), true);
-            if (!$data) continue;
-    ?>
-        <div class="card">
-            <div class="date"><?php echo h($data["date"]); ?></div>
-
-            <?php if (isset($data["audio_file"]) && $data["audio_file"] !== ""): ?>
-                <audio controls>
-                    <source src="data/<?php echo h($data["audio_file"]); ?>" type="audio/wav">
-                </audio>
-            <?php endif; ?>
-
-            <form method="post">
-                <input type="hidden" name="json_file" value="<?php echo h(basename($file)); ?>">
-                <textarea name="radio_script"><?php echo h($data["radio_script"]); ?></textarea>
-                <button type="submit" name="save_script" value="1">保存</button>
-            </form>
-
-            <?php foreach ($data["news"] as $n): ?>
-                <hr>
-                <div class="title"><?php echo h($n["title"]); ?></div>
-                <div class="muted"><?php echo h($n["pubDate"]); ?></div>
-                <a href="<?php echo h($n["link"]); ?>" target="_blank">記事を開 く</a>
-            <?php endforeach; ?>
-        </div>
-    <?php endforeach; ?>
+<div id="thinking-overlay">
+    <div id="thinking-box">
+        <div id="thinking-title">Thinking…</div>
+        <div id="thinking-sub">AI が考えています。しばらくお待ちください。</div>
     </div>
 </div>
+
+<h2>AI Thinking Media</h2>
+
+<form method="post" onsubmit="showThinking()">
+    <input
+        type="text"
+        name="seed_keyword"
+        placeholder="キーワードを入力"
+        style="width:260px"
+    >
+    <button type="submit">生成</button>
+</form>
+
+<hr>
+<?php
+$prev_date = date("Y-m-d", strtotime($base_date . " -1 day"));
+$next_date = date("Y-m-d", strtotime($base_date . " +1 day"));
+$can_next  = ($next_date <= $today);
+?>
+
+<div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
+    <a href="?base_date=<?php echo h($prev_date); ?><?php if($view_keyword) echo "&kw=".h($view_keyword); ?>">←</a>
+    <strong><?php echo h($base_date); ?></strong>
+    <?php if ($can_next): ?>
+        <a href="?base_date=<?php echo h($next_date); ?><?php if($view_keyword) echo "&kw=".h($view_keyword); ?>">→</a>
+    <?php else: ?>
+        <span style="opacity:.3">→</span>
+    <?php endif; ?>
+</div>
+
+
+<?php foreach ($results as $keyword => $files): ?>
+<?php if (empty($files)) continue; ?>
+
+<div class="keyword">
+
+<h3>
+  <a href="?kw=<?php echo h($keyword); ?>&base_date=<?php echo h($base_date); ?>">
+    <?php echo h($keyword); ?>
+  </a>
+</h3>
+
+<div class="scroll">
+
+<?php foreach ($files as $file): ?>
+<?php $data = json_decode(file_get_contents($file), true); ?>
+
+<div class="card">
+
+<textarea readonly><?php
+echo h(isset($data["analysis"]) ? $data["analysis"] : "");
+?></textarea>
+
+<?php foreach ($data["news"] as $n): ?>
+<hr>
+<div class="title"><?php echo h($n["title"]); ?></div>
+<div class="muted"><?php echo h($n["pubDate"]); ?></div>
+<a href="<?php echo h($n["link"]); ?>" target="_blank">
+Googleニュースを開く
+</a>
+<?php endforeach; ?>
+
+</div>
+
+<?php endforeach; ?>
+
+</div>
+</div>
+
 <?php endforeach; ?>
 
 <script>
-(function () {
-  const btn = document.getElementById("playAllBtn");
-  if (!btn) return;
+function showThinking(){
 
-  btn.addEventListener("click", () => {
-    const items = Array.from(document.querySelectorAll(".card")).map(card => {
-      const audio = card.querySelector("audio");
-      if (!audio) return null;
-      const dateEl = card.querySelector(".date");
-      if (!dateEl) return null;
-      const m = dateEl.textContent.match(/\d{4}-\d{2}-\d{2}/);
-      if (!m) return null;
-      return {
-        audio: audio,
-        date: m[0],
-        order: Array.from(card.parentNode.children).indexOf(card)
-      };
-    }).filter(Boolean);
+    var overlay = document.getElementById("thinking-overlay");
+    if(overlay){
+        overlay.style.display = "flex";
+    }
 
-    if (!items.length) return;
+    // ★ submit を邪魔しないように、無効化は次のイベントループで行う
+    setTimeout(function(){
+        var els = document.querySelectorAll("input, button, textarea");
+        els.forEach(function(e){
+            e.disabled = true;
+        });
+    }, 0);
 
-    items.sort((a, b) => {
-      if (a.date !== b.date) {
-        return a.date < b.date ? 1 : -1;
-      }
-      return a.order - b.order;
-    });
-
-    let i = 0;
-    const playNext = () => {
-      if (i >= items.length) return;
-      items[i].audio.currentTime = 0;
-      items[i].audio.play();
-      items[i].audio.onended = () => {
-        i++;
-        playNext();
-      };
-    };
-    playNext();
-  });
-})();
-</script>
-
-<script>
-function playAll(btn){
-    var root = btn.closest('.keyword');
-    var audios = root.querySelectorAll('audio');
-    if(!audios.length) return;
-
-    var i = 0;
-    audios[i].play();
-
-    audios[i].onended = function next(){
-        i++;
-        if(i < audios.length){
-            audios[i].play();
-            audios[i].onended = next;
-        }
-    };
+    return true;
 }
 </script>
+
 </body>
 </html>
+

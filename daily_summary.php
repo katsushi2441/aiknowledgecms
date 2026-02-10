@@ -1,13 +1,15 @@
 <?php
 date_default_timezone_set("Asia/Tokyo");
 
+$debug_info = array();
+
 /* =====================
    設定
 ===================== */
-define("OLLAMA_URL", "https://exbridge.ddns.net/api/generate");
-define("OLLAMA_MODEL", "gemma3:12b");
+define("DAILY_SUMMARY_API", "http://exbridge.ddns.net:8003/daily_summary");
 
-$data_dir = __DIR__ . "/data";
+$data_dir     = __DIR__ . "/data";
+$keyword_file = __DIR__ . "/keyword.json";
 
 /* =====================
    基準日
@@ -35,30 +37,33 @@ function h($s) {
     return htmlspecialchars($s, ENT_QUOTES, "UTF-8");
 }
 
-function http_post_json($url, $payload, $timeout = 120) {
+function http_post_json($url, $payload, $timeout = 180) {
+
     $ch = curl_init($url);
-    $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+
     curl_setopt_array($ch, array(
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_TIMEOUT => $timeout,
         CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $json,
+        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE),
         CURLOPT_HTTPHEADER => array(
             "Content-Type: application/json",
         ),
     ));
+
     $res = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($res === false) return array(false, null);
-    $data = json_decode($res, true);
-    return array(($code >= 200 && $code < 300), $data);
+    if ($res === false) return null;
+
+    return json_decode($res, true);
 }
 
 /* =====================
    保存処理（手動編集）
 ===================== */
+$saved = false;
+
 if (isset($_POST["save_summary"])) {
 
     $text = isset($_POST["summary_text"])
@@ -76,21 +81,24 @@ if (isset($_POST["save_summary"])) {
             JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
         )
     );
+
+    $summary_text = $text;
+    $saved = true;
 }
 
 /* =====================
    既存サマリー読込
 ===================== */
-$summary_text = "";
+$summary_text = isset($summary_text) ? $summary_text : "";
 
-if (file_exists($summary_file)) {
+if (!$saved && file_exists($summary_file)) {
 
     $json = json_decode(file_get_contents($summary_file), true);
     if (is_array($json) && isset($json["summary_text"])) {
         $summary_text = $json["summary_text"];
     }
 
-} else {
+} elseif (!$saved) {
 
     /* =====================
        当日分 知識JSON収集
@@ -109,69 +117,39 @@ if (file_exists($summary_file)) {
             $data = json_decode(file_get_contents($f), true);
             if (!is_array($data)) continue;
 
-            if (isset($data["radio_script"]) && trim($data["radio_script"]) !== "") {
-                $knowledge_texts[] = trim($data["radio_script"]);
+
+            if (isset($data["analysis"]) && trim($data["analysis"]) !== "") {
+                $knowledge_texts[] = trim($data["analysis"]);
             }
+
         }
     }
 
     /* =====================
-       Ollama 要約生成
+       API 要約生成
     ===================== */
     if (count($knowledge_texts) > 0) {
+        $debug_info[] = "analysis count = " . count($knowledge_texts);
 
-        $joined = implode("\n\n", $knowledge_texts);
-
-        $prompt = "
-あなたは
-「日次研究ノートをまとめる分析者」です。
-あなたは文章を評価してはいけません。
-
-以下は同一日の複数の知識レポートです。
-それぞれ異なるキーワード・テーマを扱っています。
-
-あなたの仕事は、
-これらすべてのキーワードについて、
-それぞれの背景・意味・影響を整理し、
-同一日の出来事として並列に日本語で考察することです。
-
-重要：
-- 代表的なテーマを選んではいけません
-- 特定のキーワードを中心に据えてはいけません
-- すべてのキーワードを必ず個別に扱ってください
-- 分量は均等である必要はありませんが、
-  どのキーワードも「考察」が成立している必要があります
-- 日本語で出力してください 
-
-# 出力条件
-- 600〜1200文字
-- 見出し・箇条書き・URL禁止
-- 主観的な感想は禁止
-- ニュースの羅列は禁止
-- 各キーワードごとに文脈的な整理と意味付けを行う
-- 最後に「この日全体として何が読み取れるか」を
-  短くまとめてください
-
-
-# 知識レポート一覧
-{$joined}
-";
-
-        list($ok, $res) = http_post_json(
-            OLLAMA_URL,
+        $res = http_post_json(
+            DAILY_SUMMARY_API,
             array(
-                "model" => OLLAMA_MODEL,
-                "prompt" => $prompt,
-                "stream" => false,
-                "options" => array(
-                    "temperature" => 0.4
-                )
+                "texts" => $knowledge_texts,
+                "date"  => $base_date
             )
         );
 
-        if ($ok && isset($res["response"])) {
+        if (!is_array($res)) {
+            $debug_info[] = "API response = not array (null or invalid JSON)";
+        } elseif (!isset($res["summary"])) {
+            $debug_info[] = "API response OK but summary key missing";
+        } else {
+            $debug_info[] = "API response OK, summary length = " . strlen($res["summary"]);
+        }
 
-            $summary_text = trim($res["response"]);
+        if (is_array($res) && isset($res["summary"])) {
+
+            $summary_text = trim($res["summary"]);
 
             file_put_contents(
                 $summary_file,
@@ -187,6 +165,56 @@ if (file_exists($summary_file)) {
         }
     }
 }
+
+/* =====================
+   キーワード読込（jsonのみ）
+===================== */
+$keywords = array();
+
+if (file_exists($keyword_file)) {
+
+    $json = json_decode(file_get_contents($keyword_file), true);
+
+    if (isset($json["keywords"]) && is_array($json["keywords"])) {
+        $json = $json["keywords"];
+    }
+
+    if (is_array($json)) {
+        foreach ($json as $kw) {
+            $kw = trim($kw);
+            if ($kw === "") continue;
+
+            // ★ 該当日のこのキーワードのjsonが存在するか確認
+            $pattern = $data_dir . "/" . $base_date . "_*" . $kw . "*.json";
+            $matched = glob($pattern);
+
+            if ($matched !== false && count($matched) > 0) {
+                $keywords[] = $kw;
+            }
+        }
+    }
+}
+
+/* =====================
+   全日付サマリー一覧
+===================== */
+$daily_list = array();
+$files = glob($data_dir . "/*_daily_summary.json");
+if ($files !== false) {
+    foreach ($files as $f) {
+        if (preg_match("/(\d{4}-\d{2}-\d{2})_daily_summary\.json$/", $f, $m)) {
+            $date = $m[1];
+            $wav  = $data_dir . "/" . $date . "_daily_summary.wav";
+            $daily_list[] = array(
+                "date"  => $date,
+                "audio" => file_exists($wav) ? "./data/" . $date . "_daily_summary.wav" : null
+            );
+        }
+    }
+}
+usort($daily_list, function($a, $b) {
+    return strcmp($b["date"], $a["date"]);
+});
 ?>
 <!DOCTYPE html>
 <html>
@@ -195,18 +223,88 @@ if (file_exists($summary_file)) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 body{background:#020617;color:#e5e7eb;font-family:sans-serif;padding:16px}
-textarea{width:100%;height:320px;background:#020617;color:#e5e7eb;border:1px solid #334155;border-radius:12px;padding:12px}
+textarea{width:100%;height:240px;background:#020617;color:#e5e7eb;border:1px solid #334155;border-radius:12px;padding:12px}
 button{margin-top:12px;padding:10px 16px;border-radius:10px;border:0;background:#2563eb;color:#fff}
 .date{color:#94a3b8;margin-bottom:12px}
 .nav{margin-bottom:16px}
 .nav a{color:#38bdf8;margin-right:12px}
 .audio{margin:16px 0}
+.keywords{margin:20px 0;display:flex;flex-wrap:wrap;gap:10px}
+.keywords a{
+    padding:6px 12px;
+    border-radius:999px;
+    background:#111827;
+    border:1px solid #334155;
+    color:#93c5fd;
+    font-size:13px;
+    text-decoration:none
+}
+.keywords a:hover{background:#1e293b}
+.list{margin-top:20px}
+.row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.playall{background:#16a34a}
+audio{
+    width:100%;
+    max-width:100%;
+}
+
+.row{
+    flex-wrap:wrap;
+}
+
+.row a{
+    width:100%;
+    margin-bottom:6px;
+}
+
+/* スマホ用 */
+@media (max-width:600px){
+    .row{
+        flex-direction:column;
+        align-items:stretch;
+    }
+}
+
 </style>
 </head>
 <body>
+<div style="
+    margin-bottom:16px;
+    padding:12px;
+    border-radius:10px;
+    background:#1f2937;
+    color:#fca5a5;
+    font-size:13px;
+    line-height:1.6;
+">
+<strong>DEBUG daily_summary</strong><br>
+<?php
+if (empty($debug_info)) {
+    echo "no debug info";
+} else {
+    foreach ($debug_info as $d) {
+        echo h($d) . "<br>";
+    }
+}
+?>
+</div>
+
 <img src="./images/aiknowledgecms_logo.png" width="30%" height="30%">
 
 <div class="nav">
+<?php if ($saved): ?>
+<div style="
+    margin-bottom:16px;
+    padding:10px 14px;
+    border-radius:10px;
+    background:#064e3b;
+    color:#6ee7b7;
+    font-size:14px;
+">
+    保存しました
+</div>
+<?php endif; ?>
+
 <?php
 $prev = date("Y-m-d", strtotime($base_date." -1 day"));
 $next = date("Y-m-d", strtotime($base_date." +1 day"));
@@ -217,6 +315,16 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
 <a href="?date=<?php echo h($next); ?>">翌日 →</a>
 <?php endif; ?>
 </div>
+
+<?php if (count($keywords) > 0): ?>
+<div class="keywords">
+<?php foreach ($keywords as $kw): ?>
+<a href="https://aiknowledgecms.exbridge.jp/aiknowledgecms.php?kw=<?php echo h(urlencode($kw)); ?>">
+<?php echo h($kw); ?>
+</a>
+<?php endforeach; ?>
+</div>
+<?php endif; ?>
 
 <?php if (file_exists($audio_file)): ?>
 <div class="audio">
@@ -229,6 +337,43 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
     <button type="submit" name="save_summary" value="1">保存</button>
 </form>
 
+<?php if (count($daily_list) > 0): ?>
+<button class="playall" onclick="playAll()">全部再生</button>
+
+<div class="list">
+<?php foreach ($daily_list as $d): ?>
+<div class="row">
+    <a href="?date=<?php echo h($d["date"]); ?>">
+        <?php echo h($d["date"]); ?>
+    </a>
+
+    <?php if ($d["audio"]): ?>
+    <audio
+        controls
+        src="<?php echo h($d["audio"]); ?>">
+    </audio>
+    <?php endif; ?>
+
+<?php endforeach; ?>
+</div>
+<?php endif; ?>
+</div>
+<script>
+function playAll() {
+    const audios = document.querySelectorAll(".list audio");
+    let i = 0;
+    function next() {
+        if (i >= audios.length) return;
+        audios[i].currentTime = 0;
+        audios[i].play();
+        audios[i].onended = function () {
+            i++;
+            next();
+        };
+    }
+    next();
+}
+</script>
+
 </body>
 </html>
-

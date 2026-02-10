@@ -3,6 +3,7 @@ import requests
 import json
 from pathlib import Path
 import sys
+from email.utils import parsedate_to_datetime
 
 DATA_BASE = "https://aiknowledgecms.exbridge.jp/data"
 VOICE_PROFILE_URL = "https://airadio.exbridge.jp/voice_profile.json"
@@ -33,10 +34,36 @@ def list_json_files():
     return data
 
 
-def audio_exists(name):
-    wav = name.replace(".json", ".wav")
-    r = requests.head(f"{DATA_BASE}/{wav}", timeout=5)
-    return r.status_code == 200
+def head_last_modified(url):
+    r = requests.head(url, timeout=5)
+    if r.status_code != 200:
+        return None
+    lm = r.headers.get("Last-Modified")
+    if not lm:
+        return None
+    return parsedate_to_datetime(lm)
+
+
+def needs_regenerate(json_name):
+    wav_name = json_name.replace(".json", ".wav")
+
+    json_url = f"{DATA_BASE}/{json_name}"
+    wav_url  = f"{DATA_BASE}/{wav_name}"
+
+    json_time = head_last_modified(json_url)
+    wav_time  = head_last_modified(wav_url)
+
+    if wav_time is None:
+        return True
+
+    if json_time is None:
+        return False
+
+    # 5秒以内の差は「同じ生成」とみなす
+    if abs((json_time - wav_time).total_seconds()) <= 5:
+        return False
+
+    return json_time > wav_time
 
 
 def load_json(name):
@@ -84,7 +111,7 @@ def main():
     files = list_json_files()
 
     for jf in files:
-        if audio_exists(jf):
+        if not needs_regenerate(jf):
             continue
 
         print(f"▶processing {jf}")
@@ -99,10 +126,9 @@ def main():
             continue
 
         audio_url = tts_generate(script, profile)
-
         upload_audio(audio_url, jf)
 
-        print(f"  ✔uploaded {jf}")
+        print(f"  ✔ regenerated {jf}")
 
     print("DONE")
 
