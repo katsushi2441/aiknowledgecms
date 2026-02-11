@@ -169,6 +169,9 @@ if (!$saved && file_exists($summary_file)) {
 /* =====================
    キーワード読込（jsonのみ）
 ===================== */
+/* =====================
+   キーワード読込（jsonのみ）
+===================== */
 $keywords = array();
 
 if (file_exists($keyword_file)) {
@@ -176,25 +179,21 @@ if (file_exists($keyword_file)) {
     $json = json_decode(file_get_contents($keyword_file), true);
 
     if (isset($json["keywords"]) && is_array($json["keywords"])) {
-        $json = $json["keywords"];
-    }
-
-    if (is_array($json)) {
-        foreach ($json as $kw) {
+        
+        // ★ キーワードは連想配列のキーとして取得
+        foreach ($json["keywords"] as $kw => $kw_data) {
             $kw = trim($kw);
             if ($kw === "") continue;
 
             // ★ 該当日のこのキーワードのjsonが存在するか確認
-            $pattern = $data_dir . "/" . $base_date . "_*" . $kw . "*.json";
-            $matched = glob($pattern);
-
-            if ($matched !== false && count($matched) > 0) {
+            $pattern = $data_dir . "/" . $base_date . "_" . $kw . ".json";
+            
+            if (file_exists($pattern)) {
                 $keywords[] = $kw;
             }
         }
     }
 }
-
 /* =====================
    全日付サマリー一覧
 ===================== */
@@ -268,6 +267,7 @@ audio{
 </style>
 </head>
 <body>
+<!--
 <div style="
     margin-bottom:16px;
     padding:12px;
@@ -277,7 +277,6 @@ audio{
     font-size:13px;
     line-height:1.6;
 ">
-<strong>DEBUG daily_summary</strong><br>
 <?php
 if (empty($debug_info)) {
     echo "no debug info";
@@ -288,8 +287,9 @@ if (empty($debug_info)) {
 }
 ?>
 </div>
+-->
 
-<img src="./images/aiknowledgecms_logo.png" width="30%" height="30%">
+<img src="./images/aiknowledgecms_logo.png" width="25%" height="25%">
 
 <div class="nav">
 <?php if ($saved): ?>

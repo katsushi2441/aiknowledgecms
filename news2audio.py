@@ -111,18 +111,21 @@ def main():
     files = list_json_files()
 
     for jf in files:
+
+        # ★ daily_summary 以外は処理しない
+        if not jf.endswith("_daily_summary.json"):
+            continue
+
         if not needs_regenerate(jf):
             continue
 
         print(f"▶processing {jf}")
         data = load_json(jf)
 
-        script = data.get("radio_script", "").strip()
-        if not script and jf.endswith("_daily_summary.json"):
-            script = data.get("summary_text", "").strip()
+        script = data.get("summary_text", "").strip()
 
         if not script:
-            print("  - skip (no script)")
+            print("  - skip (no summary_text)")
             continue
 
         audio_url = tts_generate(script, profile)

@@ -13,6 +13,128 @@ define("AIKNOWLEDGE_TOKEN", "秘密の文字列");
 /* =========================================================
    API : JSON GENERATION (for worker)
 ========================================================= */
+/* =========================================================
+   API : LIST JSON FILES (for worker)
+========================================================= */
+if (isset($_GET["upload_audio"])) {
+
+    header("Content-Type: application/json; charset=utf-8");
+
+    if (
+        !isset($_GET["token"]) ||
+        $_GET["token"] !== AIKNOWLEDGE_TOKEN
+    ) {
+        echo json_encode(array("status"=>"fail","reason"=>"invalid token"));
+        exit;
+    }
+
+    $raw = file_get_contents("php://input");
+    $post = json_decode($raw, true);
+
+    if (
+        !is_array($post) ||
+        !isset($post["audio_url"]) ||
+        !isset($post["json_file"])
+    ) {
+        echo json_encode(array("status"=>"fail","reason"=>"invalid payload"));
+        exit;
+    }
+
+    $audio_url = trim($post["audio_url"]);
+    $json_file = basename($post["json_file"]);
+
+    if ($audio_url === "" || $json_file === "") {
+        echo json_encode(array("status"=>"fail","reason"=>"empty value"));
+        exit;
+    }
+
+    // 保存先
+    $wav_name = str_replace(".json", ".wav", $json_file);
+    $wav_path = DATA_DIR . "/" . $wav_name;
+    $json_path = DATA_DIR . "/" . $json_file;
+
+    // wav ダウンロード
+    $wav_data = @file_get_contents($audio_url);
+    if ($wav_data === false) {
+        echo json_encode(array("status"=>"fail","reason"=>"audio download failed"));
+        exit;
+    }
+
+    if (file_put_contents($wav_path, $wav_data) === false) {
+        echo json_encode(array("status"=>"fail","reason"=>"audio save failed"));
+        exit;
+    }
+
+    // json 更新（audio 情報を追記）
+    if (file_exists($json_path)) {
+
+        $json = json_decode(file_get_contents($json_path), true);
+        if (!is_array($json)) {
+            $json = array();
+        }
+
+        $json["audio_file"] = $wav_name;
+        $json["audio_url"]  = "./data/" . $wav_name;
+        $json["audio_generated_at"] = date("Y-m-d H:i:s");
+
+        file_put_contents(
+            $json_path,
+            json_encode($json, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+        );
+    }
+
+    echo json_encode(array(
+        "status" => "ok",
+        "file"   => $wav_name
+    ));
+    exit;
+}
+
+if (isset($_GET["list_json"])) {
+
+    header("Content-Type: application/json; charset=utf-8");
+
+    if (
+        !isset($_GET["token"]) ||
+        $_GET["token"] !== AIKNOWLEDGE_TOKEN
+    ) {
+        echo json_encode(array(), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if (!file_exists(DATA_DIR)) {
+        echo json_encode(array(), JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $files = array();
+
+    foreach (scandir(DATA_DIR) as $f) {
+
+        if ($f === "." || $f === "..") {
+            continue;
+        }
+
+        // JSON 以外は除外
+        if (substr($f, -5) !== ".json") {
+            continue;
+        }
+
+        // 管理用メタJSONは除外
+        if ($f === "keyword.json") {
+            continue;
+        }
+
+        $files[] = $f;
+    }
+
+    sort($files);
+
+    echo json_encode($files, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+
 if (isset($_POST["api_seed"])) {
 
     header("Content-Type: application/json; charset=utf-8");
@@ -52,142 +174,199 @@ if (!file_exists(DATA_DIR)) {
     mkdir(DATA_DIR, 0755, true);
 }
 
-function seed_keyword_core($base, $mode = "browser", $depth = 0, &$state = null){
+function seed_keyword_core($base, $mode = "browser", $depth = 0, &$state = null) {
+    $state = initializeStateIfNeeded($state);
+    
+    // ★ グローバル上限チェック
+    if (count($state["added"]) >= 10) {
+        return buildResult($state);
+    }
+    
+    $baseAddedCount = processBaseKeyword($base, $state);
+    
+    // ★ 深さ1を超えたら派生キーワード処理をスキップ
+    if ($depth > 1) {
+        saveResults($base, $baseAddedCount, $state);
+        return buildResult($state);
+    }
+    
+    $derivedKeywords = fetchDerivedKeywords($base);
+    
+    if ($mode !== "browser" && !empty($derivedKeywords)) {
+        processDerivedKeywords($derivedKeywords, $base, $mode, $depth, $state, $baseAddedCount);
+    }
+    
+    saveResults($base, $baseAddedCount, $state);
+    return buildResult($state);
+}
 
-    if ($state === null) {
-
-        $data = load_keyword_json_safe();
-
-        $state = array(
-            "keywords"     => $data["keywords"],
-            "created"      => $data["created"],
-            "counts"       => isset($data["counts"]) ? $data["counts"] : array(),
-            "added"        => array(),
-            "tried_seeds"  => array(),
-            "tried_map"    => array(),
-            "today"        => date("Y-m-d")
-        );
+function initializeStateIfNeeded($state) {
+    if ($state !== null) {
+        return $state;
     }
 
-    if ($depth > 0) {
-        return array(
-            "added" => $state["added"],
-            "tried_seeds" => $state["tried_seeds"]
-        );
-    }
-
-    /* ★ この base が生んだ数だけを数える */
-    $base_added_count = 0;
-
-    /* ===== base 処理 ===== */
-    if (!isset($state["tried_map"][$base])) {
-
-        $state["tried_map"][$base] = true;
-
-        $base_news = fetch_google_news($base, $state["today"]);
-        if ($base_news) {
-
-            if (!in_array($base, $state["keywords"], true)) {
-                $state["keywords"][] = $base;
-                $state["created"][$base] = $state["today"];
-                if (!isset($state["counts"][$base])) {
-                    $state["counts"][$base] = 0;
-                }
-                generate_daily_json_on_seed($base, $state["today"]);
-                $state["added"][] = $base;
-            }
-        } else {
-            $state["tried_seeds"][] = $base;
+    $data = load_keyword_json_safe();
+    
+    // ★ 既存キーワードにviewsがなければ初期化
+    foreach ($data["keywords"] as $kw => $kw_data) {
+        if (!isset($kw_data["views"])) {
+            $data["keywords"][$kw]["views"] = 0;
         }
     }
+    
+    return [
+        "keywords"     => $data["keywords"],
+        "added"        => [],
+        "tried_seeds"  => [],
+        "tried_map"    => [],
+        "today"        => date("Y-m-d")
+    ];
+}
+function processBaseKeyword($base, &$state) {
+    if (isset($state["tried_map"][$base])) {
+        return 0;
+    }
+    
+    $state["tried_map"][$base] = true;
+    $baseNews = fetch_google_news($base, $state["today"]);
+    
+    if ($baseNews) {
+        addKeywordIfNew($base, $state);
+    } else {
+        $state["tried_seeds"][] = $base;
+    }
+    
+    return 0;
+}
 
-    /* ===== 派生キーワード取得（FastAPI）===== */
-    $res = http_post_json(
+function addKeywordIfNew($keyword, &$state) {
+    if (isset($state["keywords"][$keyword])) {
+        return false;
+    }
+
+    $state["keywords"][$keyword] = [
+        "created" => $state["today"],
+        "count"   => 0,
+        "views"   => 0  // ★ 追加
+    ];
+    generate_daily_json_on_seed($keyword, $state["today"]);
+    $state["added"][] = $keyword;
+
+    return true;
+}
+
+function fetchDerivedKeywords($base) {
+    $response = http_post_json(
         KEYWORD_SEED_API,
-        array(
+        [
             "keyword"   => $base,
-            "max_seeds" => 10
-        )
+            "max_seeds" => 2  // ★ 2個まで
+        ]
     );
-
-    if (
-        !is_array($res) ||
-        !isset($res["results"]) ||
-        !is_array($res["results"])
-    ) {
-        goto SAVE_AND_RETURN;
+    
+    if (!isValidResponse($response)) {
+        return [];
     }
-
-    $seeds = array();
-
-    foreach ($res["results"] as $row) {
+    
+    $keywords = [];
+    foreach ($response["results"] as $row) {
         if (isset($row["keyword"]) && is_string($row["keyword"])) {
-            $seeds[] = $row["keyword"];
+            $keywords[] = $row["keyword"];
         }
     }
+    
+    return array_values(array_unique($keywords));
+}
 
-    $seeds = array_values(array_unique($seeds));
+function isValidResponse($response) {
+    return is_array($response) 
+        && isset($response["results"]) 
+        && is_array($response["results"]);
+}
 
-    if ($mode === "browser") {
-        goto SAVE_AND_RETURN;
-    }
-
-    shuffle($seeds);
-
-    foreach ($seeds as $s) {
-
-        if (count($state["added"]) >= 10) break;
-        if (isset($state["tried_map"][$s])) continue;
-
-        /* ★ この base 由来で新規追加されたかだけを見る */
-        if (!in_array($s, $state["keywords"], true)) {
-
-            $state["keywords"][] = $s;
-            $state["created"][$s] = $state["today"];
-            if (!isset($state["counts"][$s])) {
-                $state["counts"][$s] = 0;
-            }
-
-            generate_daily_json_on_seed($s, $state["today"]);
-
-            $state["added"][] = $s;
-            $base_added_count++;
+function processDerivedKeywords($keywords, $base, $mode, $depth, &$state, &$baseAddedCount) {
+    shuffle($keywords);
+    
+    foreach ($keywords as $keyword) {
+        // ★ グローバル上限
+        if (count($state["added"]) >= 10) {
+            break;
         }
-
-        seed_keyword_core($s, $mode, $depth + 1, $state);
+        
+        if (isset($state["tried_map"][$keyword])) {
+            continue;
+        }
+        
+        if (addKeywordIfNew($keyword, $state)) {
+            $baseAddedCount++;
+        }
+        
+        // ★ depth+1 で再帰（最大depth=1まで）
+        seed_keyword_core($keyword, $mode, $depth + 1, $state);
     }
+}
 
-SAVE_AND_RETURN:
-
-    /* ★ base が生んだ数をここで確定 */
-    $state["counts"][$base] = $base_added_count;
-
+function saveResults($base, $baseAddedCount, &$state) {
+    if (isset($state["keywords"][$base])) {
+        $state["keywords"][$base]["count"] = $baseAddedCount;
+    }
+    
     file_put_contents(
         KEYWORD_JSON,
         json_encode(
-            array(
-                "keywords" => array_values(array_unique($state["keywords"])),
-                "created"  => $state["created"],
-                "counts"   => $state["counts"]
-            ),
+            ["keywords" => $state["keywords"]],
             JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
         )
     );
+}
 
-    return array(
-        "added" => array_values(array_unique($state["added"])),
+function buildResult($state) {
+    return [
+        "added"       => array_values(array_unique($state["added"])),
         "tried_seeds" => array_values(array_unique($state["tried_seeds"]))
-    );
+    ];
 }
 
 
+/* =========================================================
+   VIEW KEYWORD (GET)
+========================================================= */
+$view_keyword = "";
+if (isset($_GET["kw"])) {
+    $view_keyword = trim($_GET["kw"]);
+    
+    // ★ アクセス数をカウント
+    if ($view_keyword !== "") {
+        incrementKeywordViews($view_keyword);
+    }
+}
 
-
-
-
-
-
-
+/* =========================================================
+   アクセス数カウント関数（新規追加）
+========================================================= */
+function incrementKeywordViews($keyword) {
+    $data = load_keyword_json_safe();
+    
+    // キーワードが存在する場合のみカウント
+    if (isset($data["keywords"][$keyword])) {
+        // views フィールドがなければ初期化
+        if (!isset($data["keywords"][$keyword]["views"])) {
+            $data["keywords"][$keyword]["views"] = 0;
+        }
+        
+        // インクリメント
+        $data["keywords"][$keyword]["views"]++;
+        
+        // 保存
+        file_put_contents(
+            KEYWORD_JSON,
+            json_encode(
+                ["keywords" => $data["keywords"]],
+                JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+            )
+        );
+    }
+}
 
 /* =========================================================
    UTILITY
@@ -196,9 +375,7 @@ function load_keyword_json_safe(){
 
     if (!file_exists(KEYWORD_JSON)) {
         return array(
-            "keywords" => array(),
-            "created"  => array(),
-            "counts"   => array()
+            "keywords" => array()
         );
     }
 
@@ -206,22 +383,12 @@ function load_keyword_json_safe(){
 
     if (!is_array($json)) {
         return array(
-            "keywords" => array(),
-            "created"  => array(),
-            "counts"   => array()
+            "keywords" => array()
         );
     }
 
     if (!isset($json["keywords"]) || !is_array($json["keywords"])) {
         $json["keywords"] = array();
-    }
-
-    if (!isset($json["created"]) || !is_array($json["created"])) {
-        $json["created"] = array();
-    }
-
-    if (!isset($json["counts"]) || !is_array($json["counts"])) {
-        $json["counts"] = array();
     }
 
     return $json;
@@ -374,13 +541,8 @@ function fetch_google_news($keyword, $date){
 $data = load_keyword_json_safe();
 
 $keywords = $data["keywords"];
-$created  = $data["created"];
 
-$keyword_set = array();
-foreach ($keywords as $k) {
-    $keyword_set[$k] = true;
-}
-
+$keywords = array_keys($data["keywords"]);
 /* =========================================================
    POST : SEED KEYWORD
 ========================================================= */
@@ -413,9 +575,11 @@ if (isset($_GET["kw"])) {
 /* =========================================================
    JSON GENERATION
 ========================================================= */
+/* =========================================================
+   JSON GENERATION
+========================================================= */
 
 $results = array();
-
 
 foreach ($keywords as $kw) {
 
@@ -427,19 +591,50 @@ foreach ($keywords as $kw) {
 
         $d = date("Y-m-d", strtotime($base_date . " -".$i." day"));
 
-        $json_file = DATA_DIR . "/" . $d . "_" . $kw . ".json";
+        $json_file = DATA_DIR . "/" . $d . "_" . $kw . ".json";  // ★ ここを修正（スペースが抜けていた）
 
         if (file_exists($json_file)) {
             $results[$kw][] = $json_file;
         }
     }
 }
+
+// ★ キーワード指定がない場合、閲覧数でソート
+if ($view_keyword === "") {
+    uksort($results, function($a, $b) use ($data) {
+        $views_a = isset($data["keywords"][$a]["views"]) ? $data["keywords"][$a]["views"] : 0;
+        $views_b = isset($data["keywords"][$b]["views"]) ? $data["keywords"][$b]["views"] : 0;
+        return $views_b - $views_a;  // 降順（多い順）
+    });
+}
+
+/* ===================== SEO 用変数 ===================== */
+$page_title = "AI Knowledge CMS｜AIが毎日ニュースを分析・蓄積する知識メディア";
+if ($view_keyword !== "") {
+    $page_title = "「".$view_keyword."」の最新ニュース分析｜AI Knowledge CMS";
+}
+
+$description = "AI Knowledge CMS は、AIが毎日ニュースを収集・要約・分析し、知識として蓄積する自律型ナレッジメディアです。";
+if ($view_keyword !== "") {
+    $description = "「".$view_keyword."」に関する最新ニュースをAIが要約・分析。日付別に蓄積された知識を閲覧できます。";
+}
+
+$canonical = "https://aiknowledgecms.exbridge.jp/aiknowledgecms.php";
+if ($view_keyword !== "") {
+    $canonical .= "?kw=" . urlencode($view_keyword) . "&base_date=" . $base_date;
+}
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title><?php echo h($page_title); ?></title>
+<meta name="description" content="<?php echo h($description); ?>">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="<?php echo h($canonical); ?>">
+
 
 <style>
 body{
@@ -451,6 +646,18 @@ body{
 .keyword{
     margin-bottom:40px
 }
+.keywords{margin:20px 0;display:flex;flex-wrap:wrap;gap:10px}
+.keywords a{
+    padding:6px 12px;
+    border-radius:999px;
+    background:#111827;
+    border:1px solid #334155;
+    color:#93c5fd;
+    font-size:13px;
+    text-decoration:none
+}
+.keywords a:hover{background:#1e293b}
+.list{margin-top:20px}
 .scroll{
     display:flex;
     gap:12px;
@@ -468,11 +675,29 @@ body{
     scroll-snap-align:start;
 }
 
-@media(max-width:600px){
+/* =====================
+   Mobile Overflow Fix
+===================== */
+
+@media (max-width: 600px){
+
+    .scroll{
+        padding-right: 16px; /* スクロール余白 */
+    }
+
     .card{
-        min-width:100%;
+        width: calc(90vw - 64px);
+        flex: 0 0 calc(90vw - 64px);
+        min-width: calc(90vw - 64px);
+    }
+
+    .analysis-text{
+        max-width: 100%;
+        overflow-wrap: break-word;
+        word-break: break-word;
     }
 }
+
 textarea{
     width:100%;
     height:220px;
@@ -519,12 +744,50 @@ a{
     font-size:13px;
     color:#94a3b8
 }
-</style>
+#loading-indicator {
+    text-align: center;
+    padding: 20px;
+    color: #94a3b8;
+    display: none;
+}
 
+#loading-indicator.show {
+    display: block;
+}
+/* =====================
+   Heading Size Normalize
+===================== */
+
+/* H1：ページタイトル（普通サイズ） */
+h1{
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 24px 0 16px;
+}
+
+/* H3：セクション見出し（本文より少し大きい程度） */
+h3{
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 16px 0 8px;
+}
+
+</style>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-BP0650KDFR"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-BP0650KDFR');
+</script>
 </head>
 <body>
 
-<a href="./aiknowledgecms.php"><img src="./images/aiknowledgecms_logo.png" width="30%"></a><br><br>
+<a href="./aiknowledgecms.php"><img src="./images/aiknowledgecms_logo.png" width="25%"></a><br>
+<h1>AI Knowledge CMS｜AIが毎日ニュースを分析・蓄積する知識メディア</h1>
 
 <div id="thinking-overlay">
     <div id="thinking-box">
@@ -533,7 +796,7 @@ a{
     </div>
 </div>
 
-<h2>AI Thinking Media</h2>
+<h3>入力したキーワードで本日のニュースを検索し要約します</h3>
 
 <form method="post" onsubmit="showThinking()">
     <input
@@ -544,6 +807,15 @@ a{
     >
     <button type="submit">生成</button>
 </form>
+
+<div class="keywords">
+<?php foreach ($results as $kw => $files): ?>
+<?php if (empty($files)) continue; ?>
+<a href="#keyword-<?php echo h(urlencode($kw)); ?>">
+<?php echo h($kw); ?>
+</a>
+<?php endforeach; ?>
+</div>
 
 <hr>
 <?php
@@ -566,12 +838,15 @@ $can_next  = ($next_date <= $today);
 <?php foreach ($results as $keyword => $files): ?>
 <?php if (empty($files)) continue; ?>
 
-<div class="keyword">
+<div class="keyword" id="keyword-<?php echo h(urlencode($keyword)); ?>">
 
 <h3>
   <a href="?kw=<?php echo h($keyword); ?>&base_date=<?php echo h($base_date); ?>">
     <?php echo h($keyword); ?>
   </a>
+  <span style="font-size:13px;color:#94a3b8;font-weight:normal;">
+    (閲覧: <?php echo isset($data["keywords"][$keyword]["views"]) ? $data["keywords"][$keyword]["views"] : 0; ?>回)
+  </span>
 </h3>
 
 <div class="scroll">
@@ -603,6 +878,35 @@ Googleニュースを開く
 
 <?php endforeach; ?>
 
+<?php if ($view_keyword === ""): ?>
+<div id="loading-indicator">
+    読み込み中...
+</div>
+<?php endif; ?>
+
+<script>
+// 無限スクロールの中で
+if (scrollTop + windowHeight >= documentHeight - 500) {
+    loading = true;
+    
+    // ★ ローディング表示
+    document.getElementById('loading-indicator').classList.add('show');
+    
+    // 次の5件を表示
+    const nextIndex = Math.min(currentIndex + 5, keywords.length);
+    for (let i = currentIndex; i < nextIndex; i++) {
+        keywords[i].style.display = 'block';
+    }
+    currentIndex = nextIndex;
+    
+    setTimeout(() => {
+        // ★ ローディング非表示
+        document.getElementById('loading-indicator').classList.remove('show');
+        loading = false;
+    }, 300);
+}
+</script>
+
 <script>
 function showThinking(){
 
@@ -622,7 +926,72 @@ function showThinking(){
     return true;
 }
 </script>
+<!-- HTMLの後半、</body>の前に追加 -->
 
+<script>
+// ★ 無限スクロール実装
+(function() {
+    // キーワード指定がある場合は無限スクロール不要
+    <?php if ($view_keyword !== ""): ?>
+    return;
+    <?php endif; ?>
+    
+    const keywords = document.querySelectorAll('.keyword');
+    let currentIndex = 5;  // 最初に表示する件数
+    
+    // 最初は5件のみ表示
+    keywords.forEach((kw, index) => {
+        if (index >= currentIndex) {
+            kw.style.display = 'none';
+        }
+    });
+    
+    // スクロールイベント
+    let loading = false;
+    
+    window.addEventListener('scroll', function() {
+        if (loading) return;
+        if (currentIndex >= keywords.length) return;
+        
+        // 画面下部に近づいたら
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.documentElement.scrollHeight;
+        
+        if (scrollTop + windowHeight >= documentHeight - 500) {
+            loading = true;
+            
+            // 次の5件を表示
+            const nextIndex = Math.min(currentIndex + 5, keywords.length);
+            for (let i = currentIndex; i < nextIndex; i++) {
+                keywords[i].style.display = 'block';
+            }
+            currentIndex = nextIndex;
+            
+            setTimeout(() => {
+                loading = false;
+            }, 300);
+        }
+    });
+})();
+
+function showThinking(){
+    // 既存のコード
+    var overlay = document.getElementById("thinking-overlay");
+    if(overlay){
+        overlay.style.display = "flex";
+    }
+
+    setTimeout(function(){
+        var els = document.querySelectorAll("input, button, textarea");
+        els.forEach(function(e){
+            e.disabled = true;
+        });
+    }, 0);
+
+    return true;
+}
+</script>
 </body>
 </html>
 

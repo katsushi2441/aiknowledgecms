@@ -110,6 +110,26 @@ Any outward expression (articles, audio, summaries, media) should be a **byprodu
 
 ---
 
+## Runtime Architecture
+
+AIKnowledgeCMS runs as a distributed but minimal system:
+
+- Web Layer (PHP)
+  - Public browsing & keyword navigation
+  - JSON storage (`/data/*.json`)
+  - API endpoints for workers and audio upload
+
+- Worker Layer (Python)
+  - Autonomous keyword expansion
+  - Daily knowledge generation
+  - Non-interactive background execution
+
+- Optional Media Layer
+  - Audio generation (daily summary only)
+  - Media output is strictly downstream
+
+---
+
 ## Relationship to Other Projects
 
 AIKnowledgeCMS can function independently, but is designed to integrate cleanly with external systems such as:
