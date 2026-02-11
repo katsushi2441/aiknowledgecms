@@ -74,6 +74,14 @@ This separation keeps knowledge accumulation stable while allowing media-related
 
 ---
 
+## Screenshot
+
+![AIKnowledgeCMS Screenshot](images/aiknowledgecms.png)
+![AIKnowledgeCMS Screenshot](images/aiknowledgecms_daily.png)
+![AIKnowledgeCMS Screenshot](images/aiknowledge_mobile.jpg)
+
+---
+
 ## What AIKnowledgeCMS Is NOT
 
 - Not a news aggregator
