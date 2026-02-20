@@ -15,12 +15,11 @@ $keyword_file = __DIR__ . "/keyword.json";
    基準日
 ===================== */
 $today = date("Y-m-d");
-$base_date = $today;
+$yesterday = date("Y-m-d", strtotime("-1 day"));
+$base_date = date("Y-m-d", strtotime("-1 day"));
 
-if (isset($_GET["date"])) {
-    if (preg_match("/^\d{4}-\d{2}-\d{2}$/", $_GET["date"])) {
-        $base_date = $_GET["date"];
-    }
+if (!empty($_GET["date"]) && preg_match("/^\d{4}-\d{2}-\d{2}$/", $_GET["date"])) {
+    $base_date = $_GET["date"];
 }
 
 /* =====================
@@ -63,7 +62,6 @@ function http_post_json($url, $payload, $timeout = 180) {
    保存処理（手動編集）
 ===================== */
 $saved = false;
-
 if (isset($_POST["save_summary"])) {
 
     $text = isset($_POST["summary_text"])
@@ -87,9 +85,41 @@ if (isset($_POST["save_summary"])) {
 }
 
 /* =====================
+   削除処理
+===================== */
+if (isset($_POST["delete_summary"])) {
+
+    if ($base_date < $today) {
+
+        if (file_exists($summary_file)) {
+            unlink($summary_file);
+        }
+
+        if (file_exists($audio_file)) {
+            unlink($audio_file);
+        }
+
+        // 画面リロード
+        header("Location: ?date=" . $base_date);
+        exit;
+    }
+}
+
+
+/* =====================
    既存サマリー読込
 ===================== */
 $summary_text = isset($summary_text) ? $summary_text : "";
+
+/* =====================
+   テスト用：毎回削除
+===================== */
+if (file_exists($summary_file)) {
+    //unlink($summary_file);
+}
+
+
+
 
 if (!$saved && file_exists($summary_file)) {
 
@@ -103,23 +133,63 @@ if (!$saved && file_exists($summary_file)) {
     /* =====================
        当日分 知識JSON収集
     ===================== */
+    /* =====================
+       当日分 知識JSON収集
+    ===================== */
     $knowledge_texts = array();
+
+    // ★ keyword.json から統計取得
+    $keyword_master = array();
+    if (file_exists($keyword_file)) {
+        $tmp = json_decode(file_get_contents($keyword_file), true);
+        if (isset($tmp["keywords"]) && is_array($tmp["keywords"])) {
+            $keyword_master = $tmp["keywords"];
+        }
+    }
 
     $files = glob($data_dir . "/" . $base_date . "_*.json");
     if ($files !== false) {
 
+        $limit_count = 0;
+
         foreach ($files as $f) {
 
+            if ($limit_count >= 10) {
+                break;
+            }
+
             if (preg_match("/_daily_summary\.json$/", $f)) {
+                continue;
+            }
+
+            // ★ ファイル名からキーワード抽出
+            if (!preg_match("/\d{4}-\d{2}-\d{2}_(.+)\.json$/", $f, $m)) {
+                continue;
+            }
+
+            $kw = $m[1];
+
+            // ★ keyword.json に存在しない場合は除外
+            if (!isset($keyword_master[$kw])) {
+                continue;
+            }
+
+            // ★ views > 0 && count > 0 条件
+            if (
+                !isset($keyword_master[$kw]["views"]) ||
+                !isset($keyword_master[$kw]["count"]) ||
+                intval($keyword_master[$kw]["views"]) <= 0 ||
+                intval($keyword_master[$kw]["count"]) <= 0
+            ) {
                 continue;
             }
 
             $data = json_decode(file_get_contents($f), true);
             if (!is_array($data)) continue;
 
-
             if (isset($data["analysis"]) && trim($data["analysis"]) !== "") {
                 $knowledge_texts[] = trim($data["analysis"]);
+                $limit_count++;
             }
 
         }
@@ -128,14 +198,31 @@ if (!$saved && file_exists($summary_file)) {
     /* =====================
        API 要約生成
     ===================== */
-    if (count($knowledge_texts) > 0) {
+    if (count($knowledge_texts) > 0 && $base_date < $today) {
         $debug_info[] = "analysis count = " . count($knowledge_texts);
 
+        $joined = implode("\n\n", $knowledge_texts);
+
+        $prompt = "
+以下の知識レポートを、そのまま簡潔に日本語で要約してください。
+評価・感想・提案・改善点は絶対に出力しません。
+
+【厳守ルール】
+・要約本文のみ出力すること
+・感想・評価・コメント・提案は一切不要
+・箇条書きや見出しは使わず、文章でまとめること
+・日本語のみ使用すること
+・文字数：600〜2200文字
+
+日付：{$base_date}
+
+知識レポート：
+{$joined}
+";
         $res = http_post_json(
             DAILY_SUMMARY_API,
             array(
-                "texts" => $knowledge_texts,
-                "date"  => $base_date
+                "prompt" => $prompt
             )
         );
 
@@ -194,6 +281,11 @@ if (file_exists($keyword_file)) {
         }
     }
 }
+
+if (count($keywords) > 20) {
+    $keywords = array_slice($keywords, 0, 20);
+}
+
 /* =====================
    全日付サマリー一覧
 ===================== */
@@ -221,6 +313,49 @@ usort($daily_list, function($a, $b) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
+/* Thinking Overlay */
+#thinking-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(2,6,23,0.85);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:9999
+}
+#thinking-box{
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:14px;
+    padding:24px 32px;
+    text-align:center
+}
+#thinking-title{
+    font-size:18px;
+    font-weight:700;
+    margin-bottom:8px
+}
+#thinking-sub{
+    font-size:13px;
+    color:#94a3b8
+}
+#loading-indicator {
+    text-align: center;
+    padding: 20px;
+    color: #94a3b8;
+    display: none;
+}
+
+#loading-indicator.show {
+    display: block;
+}
+/* H1：ページタイトル（普通サイズ） */
+h1{
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 24px 0 16px;
+}
 body{background:#020617;color:#e5e7eb;font-family:sans-serif;padding:16px}
 textarea{width:100%;height:240px;background:#020617;color:#e5e7eb;border:1px solid #334155;border-radius:12px;padding:12px}
 button{margin-top:12px;padding:10px 16px;border-radius:10px;border:0;background:#2563eb;color:#fff}
@@ -244,11 +379,14 @@ button{margin-top:12px;padding:10px 16px;border-radius:10px;border:0;background:
 .playall{background:#16a34a}
 audio{
     width:100%;
-    max-width:100%;
+    max-width:600px;
 }
 
 .row{
     flex-wrap:wrap;
+    display:flex;
+    flex-direction:column;
+    align-items:stretch;
 }
 
 .row a{
@@ -289,7 +427,17 @@ if (empty($debug_info)) {
 </div>
 -->
 
+<a href="?date=<?php echo h($yesterday); ?>">
 <img src="./images/aiknowledgecms_logo.png" width="25%" height="25%">
+</a>
+<h1>AI Knowledge CMS｜AIが毎日ニュースを分析・蓄積する知識メディア</h1>
+
+<div id="thinking-overlay">
+    <div id="thinking-box">
+        <div id="thinking-title">Thinking </div>
+        <div id="thinking-sub">AI が考えています。しばらくお待ちください。</div>
+    </div>
+</div>
 
 <div class="nav">
 <?php if ($saved): ?>
@@ -319,7 +467,7 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
 <?php if (count($keywords) > 0): ?>
 <div class="keywords">
 <?php foreach ($keywords as $kw): ?>
-<a href="https://aiknowledgecms.exbridge.jp/aiknowledgecms.php?kw=<?php echo h(urlencode($kw)); ?>">
+<a href="https://aiknowledgecms.exbridge.jp/aiknowledgecms.php?base_date=<?php echo h($base_date); ?>&kw=<?php echo h(urlencode($kw)); ?>">
 <?php echo h($kw); ?>
 </a>
 <?php endforeach; ?>
@@ -332,10 +480,20 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
 </div>
 <?php endif; ?>
 
-<form method="post">
+<form method="post" onsubmit="showThinking()">
     <textarea name="summary_text"><?php echo h($summary_text); ?></textarea>
     <button type="submit" name="save_summary" value="1">保存</button>
+
+<?php if ($base_date < $today): ?>
+    <button type="submit" name="delete_summary" value="1" 
+    style="background:#b91c1c;margin-left:10px;"
+    onclick="return confirm('本当に削除しますか？');">
+    削除
+    </button>
+<?php endif; ?>
+
 </form>
+
 
 <?php if (count($daily_list) > 0): ?>
 <button class="playall" onclick="playAll()">全部再生</button>
@@ -359,6 +517,31 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
 <?php endif; ?>
 </div>
 <script>
+(function(){
+    var s = document.createElement('script');
+    s.src = 'https://aiknowledgecms.exbridge.jp/simpletrack.php'
+          + '?url=' + encodeURIComponent(location.href)
+          + '&ref=' + encodeURIComponent(document.referrer);
+    document.head.appendChild(s);
+})();
+</script>
+<script>
+function showThinking(){
+    // 既存のコード
+    var overlay = document.getElementById("thinking-overlay");
+    if(overlay){
+        overlay.style.display = "flex";
+    }
+
+    setTimeout(function(){
+        var els = document.querySelectorAll("input, button, textarea");
+        els.forEach(function(e){
+            e.disabled = true;
+        });
+    }, 0);
+
+    return true;
+}
 function playAll() {
     const audios = document.querySelectorAll(".list audio");
     let i = 0;

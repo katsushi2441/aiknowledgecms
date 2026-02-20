@@ -134,6 +134,264 @@ if (isset($_GET["list_json"])) {
     exit;
 }
 
+if (isset($_POST["api_cleanup_keywords"])) {
+
+    header("Content-Type: application/json; charset=utf-8");
+
+    if (
+        !isset($_POST["token"]) ||
+        $_POST["token"] !== AIKNOWLEDGE_TOKEN
+    ) {
+        echo json_encode(array("status"=>"fail","reason"=>"invalid token"));
+        exit;
+    }
+
+    $data = load_keyword_json_safe();
+    $keywords = $data["keywords"];
+
+    $deleted = array();
+    $today = date("Y-m-d");
+
+    /* ===== まとめて一般語判定 ===== */
+
+    $kw_list = array_keys($keywords);
+
+    $api_payload = json_encode(
+        array("keywords"=>$kw_list),
+        JSON_UNESCAPED_UNICODE
+    );
+
+    $ch = curl_init("http://exbridge.ddns.net:8003/keyword_type_batch");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $api_payload);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array("Content-Type: application/json"));
+
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $type_map = array();
+
+    if ($response !== false) {
+
+        $res = json_decode($response, true);
+
+        if (
+            is_array($res) &&
+            isset($res["results"]) &&
+            is_array($res["results"])
+        ) {
+            foreach ($res["results"] as $row) {
+
+                if (
+                    isset($row["keyword"]) &&
+                    isset($row["type"])
+                ) {
+
+                    $k = trim($row["keyword"]);
+
+                    if ($k !== "") {
+                        $type_map[$k] = $row["type"];
+                    }
+                }
+            }
+        }
+    }
+
+    foreach ($keywords as $kw => $info) {
+
+        $created = isset($info["created"]) ? $info["created"] : "";
+
+        /* ===== 当日生成は削除しない ===== */
+
+        if ($created === $today) {
+            continue;
+        }
+
+        if (
+            isset($type_map[$kw]) &&
+            $type_map[$kw] === "general"
+        ) {
+            $deleted[] = $kw;
+            unset($keywords[$kw]);
+            continue;
+        }
+
+        $count = isset($info["count"]) ? (int)$info["count"] : 0;
+        $views = isset($info["views"]) ? (int)$info["views"] : 0;
+
+        if ($count === 0 && $views === 0) {
+            $deleted[] = $kw;
+            unset($keywords[$kw]);
+        }
+    }
+
+    file_put_contents(
+        KEYWORD_JSON,
+        json_encode(
+            array("keywords"=>$keywords),
+            JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+        )
+    );
+
+    echo json_encode(array(
+        "status"=>"ok",
+        "deleted"=>$deleted
+    ));
+
+    exit;
+}
+
+
+
+if (isset($_POST["api_cleanup_keywords_all"])) {
+
+    header("Content-Type: application/json; charset=utf-8");
+
+    if (
+        !isset($_POST["token"]) ||
+        $_POST["token"] !== AIKNOWLEDGE_TOKEN
+    ) {
+        echo json_encode(array("status"=>"fail","reason"=>"invalid token"));
+        exit;
+    }
+
+    $data = load_keyword_json_safe();
+    $keywords = $data["keywords"];
+
+    $deleted = array();
+
+    /* ===== まとめて一般語判定 ===== */
+
+    $kw_list = array_keys($keywords);
+
+    $api_payload = json_encode(
+        array("keywords"=>$kw_list),
+        JSON_UNESCAPED_UNICODE
+    );
+
+    $ch = curl_init("http://exbridge.ddns.net:8003/keyword_type_batch");
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $api_payload);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array("Content-Type: application/json"));
+
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $type_map = array();
+
+    if ($response !== false) {
+
+        $res = json_decode($response, true);
+
+        if (
+            is_array($res) &&
+            isset($res["results"]) &&
+            is_array($res["results"])
+        ) {
+            foreach ($res["results"] as $row) {
+
+                if (
+                    isset($row["keyword"]) &&
+                    isset($row["type"])
+                ) {
+
+                    $k = trim($row["keyword"]);
+
+                    if ($k !== "") {
+                        $type_map[$k] = $row["type"];
+                    }
+                }
+            }
+        }
+    }
+
+
+    foreach ($keywords as $kw => $info) {
+
+        if (
+            isset($type_map[$kw]) &&
+            $type_map[$kw] === "general"
+        ) {
+            $deleted[] = $kw;
+            unset($keywords[$kw]);
+            continue;
+        }
+
+        $count = isset($info["count"]) ? (int)$info["count"] : 0;
+        $views = isset($info["views"]) ? (int)$info["views"] : 0;
+
+        if ($count === 0 && $views === 0) {
+            $deleted[] = $kw;
+            unset($keywords[$kw]);
+        }
+    }
+
+    file_put_contents(
+        KEYWORD_JSON,
+        json_encode(
+            array("keywords"=>$keywords),
+            JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+        )
+    );
+
+    echo json_encode(array(
+        "status"=>"ok",
+        "deleted"=>$deleted
+    ));
+
+    exit;
+
+
+}
+
+
+if (isset($_POST["api_generate_daily"])) {
+
+    header("Content-Type: application/json; charset=utf-8");
+
+    if (
+        !isset($_POST["token"]) ||
+        $_POST["token"] !== AIKNOWLEDGE_TOKEN
+    ) {
+        echo json_encode(array("status"=>"fail","reason"=>"invalid token"));
+        exit;
+    }
+
+    $keyword = isset($_POST["keyword"]) ? trim($_POST["keyword"]) : "";
+
+    if ($keyword === "") {
+        echo json_encode(array("status"=>"fail","reason"=>"empty keyword"));
+        exit;
+    }
+
+    // $today = date("Y-m-d");
+    // ★ 当日ではなく前日を対象日にする
+    $today = date("Y-m-d", strtotime("-1 day"));
+    $json_file = DATA_DIR . "/" . $today . "_" . $keyword . ".json";
+
+    // すでに存在するなら何もしない
+    if (file_exists($json_file)) {
+        echo json_encode(array(
+            "status" => "skip",
+            "reason" => "already exists"
+        ));
+        exit;
+    }
+
+    // ★ 日次JSON生成のみ
+    $ok = generate_daily_json_on_seed($keyword, $today);
+
+    if ($ok) {
+        echo json_encode(array("status"=>"ok"));
+    } else {
+        echo json_encode(array("status"=>"fail","reason"=>"no news"));
+    }
+
+    exit;
+}
+
 
 if (isset($_POST["api_seed"])) {
 
@@ -206,14 +464,27 @@ function initializeStateIfNeeded($state) {
     }
 
     $data = load_keyword_json_safe();
-    
-    // ★ 既存キーワードにviewsがなければ初期化
+
+    // ★既存キーワードにviewsがなければ初期化
+    $needs_save = false;
+
     foreach ($data["keywords"] as $kw => $kw_data) {
         if (!isset($kw_data["views"])) {
             $data["keywords"][$kw]["views"] = 0;
+            $needs_save = true;
         }
     }
-    
+
+    if ($needs_save) {
+        file_put_contents(
+            KEYWORD_JSON,
+            json_encode(
+                ["keywords" => $data["keywords"]],
+                JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+            )
+        );
+    }
+
     return [
         "keywords"     => $data["keywords"],
         "added"        => [],
@@ -222,6 +493,8 @@ function initializeStateIfNeeded($state) {
         "today"        => date("Y-m-d")
     ];
 }
+
+
 function processBaseKeyword($base, &$state) {
     if (isset($state["tried_map"][$base])) {
         return 0;
@@ -513,20 +786,24 @@ function fetch_google_news($keyword, $date){
     $obj = simplexml_load_string($xml);
     if (!$obj || !isset($obj->channel->item)) return array();
 
-    $start = strtotime($date . " 00:00:00");
-    $end   = strtotime($date . " 23:59:59");
+    $tz_jst = new DateTimeZone("Asia/Tokyo");
+
+    $start = new DateTime($date . " 00:00:00", $tz_jst);
+    $end   = new DateTime($date . " 23:59:59", $tz_jst);
 
     $items = array();
 
     foreach ($obj->channel->item as $item) {
 
-        $pub = strtotime((string)$item->pubDate);
+        $pub = new DateTime((string)$item->pubDate);
+        $pub->setTimezone($tz_jst);
+
         if ($pub < $start || $pub > $end) continue;
 
         $items[] = array(
             "title"   => trim((string)$item->title),
             "link"    => trim((string)$item->link),
-            "pubDate" => trim((string)$item->pubDate)
+            "pubDate" => $pub->format("Y-m-d H:i:s")
         );
 
         if (count($items) >= NEWS_LIMIT) break;
@@ -535,12 +812,13 @@ function fetch_google_news($keyword, $date){
     return $items;
 }
 
+
 /* =========================================================
    LOAD KEYWORDS
 ========================================================= */
 $data = load_keyword_json_safe();
 
-$keywords = $data["keywords"];
+$keywords_data = $data["keywords"];
 
 $keywords = array_keys($data["keywords"]);
 /* =========================================================
@@ -572,32 +850,49 @@ if (isset($_GET["kw"])) {
     $view_keyword = trim($_GET["kw"]);
 }
 
-/* =========================================================
-   JSON GENERATION
-========================================================= */
-/* =========================================================
-   JSON GENERATION
-========================================================= */
+function build_results_by_date($keywords, $base_date, $view_keyword = "") {
 
-$results = array();
+    $results = array();
 
-foreach ($keywords as $kw) {
+    foreach ($keywords as $kw) {
 
-    if ($view_keyword !== "" && $kw !== $view_keyword) continue;
+        if ($view_keyword !== "" && $kw !== $view_keyword) continue;
 
-    $results[$kw] = array();
+        // ★ 該当日があるキーワードだけ対象
+        $today_file = DATA_DIR . "/" . $base_date . "_" . $kw . ".json";
 
-    for ($i = 0; $i < 10; $i++) {
+        if (!file_exists($today_file)) {
+            continue;
+        }
 
-        $d = date("Y-m-d", strtotime($base_date . " -".$i." day"));
+        $results[$kw] = array();
 
-        $json_file = DATA_DIR . "/" . $d . "_" . $kw . ".json";  // ★ ここを修正（スペースが抜けていた）
+        // ★ 過去10日分を収集
+        for ($i = 0; $i < 10; $i++) {
 
-        if (file_exists($json_file)) {
-            $results[$kw][] = $json_file;
+            $ts = strtotime("-".$i." day", strtotime($base_date));
+            $d  = date("Y-m-d", $ts);
+
+            $json_file = DATA_DIR . "/" . $d . "_" . $kw . ".json";
+
+            if (file_exists($json_file)) {
+                $results[$kw][] = $json_file;
+            }
         }
     }
+
+    return $results;
 }
+
+
+/* =========================================================
+   JSON GENERATION
+========================================================= */
+/* =========================================================
+   JSON GENERATION
+========================================================= */
+
+$results = build_results_by_date($keywords, $base_date, $view_keyword);
 
 // ★ キーワード指定がない場合、閲覧数でソート
 if ($view_keyword === "") {
@@ -775,6 +1070,15 @@ h3{
 }
 
 </style>
+<script>
+(function(){
+    var s = document.createElement('script');
+    s.src = 'https://aiknowledgecms.exbridge.jp/simpletrack.php'
+          + '?url=' + encodeURIComponent(location.href)
+          + '&ref=' + encodeURIComponent(document.referrer);
+    document.head.appendChild(s);
+})();
+</script>
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-BP0650KDFR"></script>
 <script>
@@ -809,13 +1113,39 @@ h3{
 </form>
 
 <div class="keywords">
-<?php foreach ($results as $kw => $files): ?>
-<?php if (empty($files)) continue; ?>
+<?php
+
+$today_keywords = [];
+
+// ★ 該当日JSONがあるキーワードだけ抽出
+foreach ($keywords as $kw) {
+
+    $today_file = DATA_DIR . "/" . $base_date . "_" . $kw . ".json";
+
+    if (file_exists($today_file)) {
+        $today_keywords[] = $kw;
+    }
+}
+
+// ★ 閲覧数順にソート
+usort($today_keywords, function($a, $b) use ($data) {
+    $views_a = isset($data["keywords"][$a]["views"]) ? $data["keywords"][$a]["views"] : 0;
+    $views_b = isset($data["keywords"][$b]["views"]) ? $data["keywords"][$b]["views"] : 0;
+    return $views_b - $views_a;
+});
+
+// ★ 上位20件
+$today_keywords = array_slice($today_keywords, 0, 20);
+
+foreach ($today_keywords as $kw):
+?>
 <a href="#keyword-<?php echo h(urlencode($kw)); ?>">
 <?php echo h($kw); ?>
 </a>
 <?php endforeach; ?>
+
 </div>
+
 
 <hr>
 <?php
@@ -828,12 +1158,11 @@ $can_next  = ($next_date <= $today);
     <a href="?base_date=<?php echo h($prev_date); ?><?php if($view_keyword) echo "&kw=".h($view_keyword); ?>">←</a>
     <strong><?php echo h($base_date); ?></strong>
     <?php if ($can_next): ?>
-        <a href="?base_date=<?php echo h($next_date); ?><?php if($view_keyword) echo "&kw=".h($view_keyword); ?>">→</a>
+        <a href="?base_date=<?php echo h($next_date); ?><?php if($view_keyword) echo "&kw=".h($view_keyword); ?>">→</a> <a href="./daily_summary.php">サマリー</a>
     <?php else: ?>
         <span style="opacity:.3">→</span>
     <?php endif; ?>
 </div>
-
 
 <?php foreach ($results as $keyword => $files): ?>
 <?php if (empty($files)) continue; ?>
@@ -852,15 +1181,15 @@ $can_next  = ($next_date <= $today);
 <div class="scroll">
 
 <?php foreach ($files as $file): ?>
-<?php $data = json_decode(file_get_contents($file), true); ?>
+<?php $daily = json_decode(file_get_contents($file), true); ?>
 
 <div class="card">
 
 <textarea readonly><?php
-echo h(isset($data["analysis"]) ? $data["analysis"] : "");
+echo h(isset($daily["analysis"]) ? $daily["analysis"] : "");
 ?></textarea>
 
-<?php foreach ($data["news"] as $n): ?>
+<?php foreach ($daily["news"] as $n): ?>
 <hr>
 <div class="title"><?php echo h($n["title"]); ?></div>
 <div class="muted"><?php echo h($n["pubDate"]); ?></div>
@@ -884,49 +1213,7 @@ Googleニュースを開く
 </div>
 <?php endif; ?>
 
-<script>
-// 無限スクロールの中で
-if (scrollTop + windowHeight >= documentHeight - 500) {
-    loading = true;
-    
-    // ★ ローディング表示
-    document.getElementById('loading-indicator').classList.add('show');
-    
-    // 次の5件を表示
-    const nextIndex = Math.min(currentIndex + 5, keywords.length);
-    for (let i = currentIndex; i < nextIndex; i++) {
-        keywords[i].style.display = 'block';
-    }
-    currentIndex = nextIndex;
-    
-    setTimeout(() => {
-        // ★ ローディング非表示
-        document.getElementById('loading-indicator').classList.remove('show');
-        loading = false;
-    }, 300);
-}
-</script>
 
-<script>
-function showThinking(){
-
-    var overlay = document.getElementById("thinking-overlay");
-    if(overlay){
-        overlay.style.display = "flex";
-    }
-
-    // ★ submit を邪魔しないように、無効化は次のイベントループで行う
-    setTimeout(function(){
-        var els = document.querySelectorAll("input, button, textarea");
-        els.forEach(function(e){
-            e.disabled = true;
-        });
-    }, 0);
-
-    return true;
-}
-</script>
-<!-- HTMLの後半、</body>の前に追加 -->
 
 <script>
 // ★ 無限スクロール実装
@@ -937,7 +1224,7 @@ function showThinking(){
     <?php endif; ?>
     
     const keywords = document.querySelectorAll('.keyword');
-    let currentIndex = 5;  // 最初に表示する件数
+    let currentIndex = 30;  // 最初に表示する件数
     
     // 最初は5件のみ表示
     keywords.forEach((kw, index) => {

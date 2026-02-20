@@ -1,8 +1,8 @@
 # AIKnowledgeCMS
 
-AIKnowledgeCMS is a self-growing knowledge-oriented CMS that automatically collects, filters, and organizes domain-specific information into a long-term knowledge base.
+AIKnowledgeCMS is an AI-powered knowledge engine that continuously collects, structures, summarizes, and preserves domain-specific information as long-term accumulated knowledge.
 
-Rather than publishing content, it is designed to **accumulate understanding** over time.
+Rather than publishing content, it is designed to **compound understanding over time**.
 
 ---
 
@@ -14,11 +14,12 @@ Most CMS platforms are optimized for:
 - SEO and visibility
 - Manual content updates
 
-AIKnowledgeCMS takes a different stance.
+AIKnowledgeCMS takes a fundamentally different stance.
 
 - Learning happens continuously, even without posting
 - Knowledge should compound, not reset daily
 - A system should stay alive without constant human input
+- Daily summaries should emerge naturally from accumulated knowledge
 
 This project exists to support **quiet, consistent knowledge accumulation** driven by genuine interests, not engagement metrics.
 
@@ -26,12 +27,14 @@ This project exists to support **quiet, consistent knowledge accumulation** driv
 
 ## What AIKnowledgeCMS Does
 
-AIKnowledgeCMS operates as an autonomous knowledge loop:
+AIKnowledgeCMS operates as an autonomous knowledge engine:
 
 - Collects information from predefined, trusted sources
-- Filters and analyzes content using AI-assisted logic
+- Structures and analyzes content using AI-assisted logic
 - Stores results as structured, date-based knowledge JSON
-- Accumulates insight incrementally, day by day
+- Generates daily structured summaries (`daily_summary.php`)
+- Preserves all historical context without overwriting
+- Provides lightweight first-party tracking (`simpletrack.php`)
 
 The system grows naturally alongside your thinking, research, or observation process.
 
@@ -39,10 +42,11 @@ The system grows naturally alongside your thinking, research, or observation pro
 
 ## How It Works (Conceptual Flow)
 
-1. External information is collected per topic or keyword  
-2. Each item is analyzed and stored as structured knowledge  
-3. Daily knowledge is optionally summarized  
-4. Knowledge remains accessible, searchable, and reusable  
+1. External information is collected per topic or keyword
+2. Each item is structured and stored as knowledge JSON
+3. Daily knowledge is automatically summarized
+4. Summaries can optionally feed downstream audio/media layers
+5. Knowledge remains accessible, searchable, and cumulative
 
 Nothing is overwritten.  
 Nothing is optimized for trends.  
@@ -61,6 +65,12 @@ AIKnowledgeCMS is intentionally split into small, role-specific components.
   - Keyword navigation
   - Manual edits when needed
 
+- `daily_summary.php`  
+  Generates structured daily summaries from accumulated knowledge.
+
+- `simpletrack.php`  
+  Provides lightweight, privacy-first, first-party analytics without external dependencies.
+
 - `aiknowledgecms.py`  
   Performs AI-assisted processing, including:
   - Content analysis
@@ -68,9 +78,9 @@ AIKnowledgeCMS is intentionally split into small, role-specific components.
   - Structured JSON generation
 
 - `news2audio.py`  
-  Converts accumulated knowledge into audio-ready scripts, enabling optional downstream use such as narration or radio-style output.
+  Converts accumulated knowledge into audio-ready scripts, enabling optional narration or radio-style output.
 
-This separation keeps knowledge accumulation stable while allowing media-related extensions to evolve independently.
+This separation keeps knowledge accumulation stable while allowing summary, analytics, and media layers to evolve independently.
 
 ---
 
@@ -97,10 +107,11 @@ AIKnowledgeCMS values **relevance, continuity, and clarity** over reach.
 
 AIKnowledgeCMS is suited for:
 
-- Personal knowledge bases
+- Personal knowledge engines
 - Long-term research tracking
 - Domain-focused learning archives
 - Small teams sharing accumulated understanding
+- Systems that require daily structured intelligence snapshots
 
 It works best where **thinking long-term matters more than posting often**.
 
@@ -110,9 +121,10 @@ It works best where **thinking long-term matters more than posting often**.
 
 AIKnowledgeCMS follows a simple order:
 
-1. Learn for yourself  
-2. Organize what matters  
-3. Let knowledge accumulate naturally  
+1. Learn continuously
+2. Structure what matters
+3. Generate daily clarity
+4. Let knowledge accumulate naturally
 
 Any outward expression (articles, audio, summaries, media) should be a **byproduct**, not the objective.
 
@@ -120,21 +132,28 @@ Any outward expression (articles, audio, summaries, media) should be a **byprodu
 
 ## Runtime Architecture
 
-AIKnowledgeCMS runs as a distributed but minimal system:
+AIKnowledgeCMS runs as a layered but minimal system:
 
-- Web Layer (PHP)
-  - Public browsing & keyword navigation
-  - JSON storage (`/data/*.json`)
-  - API endpoints for workers and audio upload
+### Web Layer (PHP)
+- Public browsing & keyword navigation
+- JSON storage (`/data/*.json`)
+- Daily summary rendering
+- Lightweight tracking (`simpletrack.php`)
+- API endpoints for workers and audio upload
 
-- Worker Layer (Python)
-  - Autonomous keyword expansion
-  - Daily knowledge generation
-  - Non-interactive background execution
+### Worker Layer (Python)
+- Autonomous keyword expansion
+- Daily knowledge generation
+- Non-interactive background execution
 
-- Optional Media Layer
-  - Audio generation (daily summary only)
-  - Media output is strictly downstream
+### Summary Layer
+- Structured daily intelligence snapshots
+- Date-based preservation model
+
+### Optional Media Layer
+- Audio generation (daily summary)
+- Downstream integration (AIRadio, video pipelines, etc.)
+- Media output is strictly downstream
 
 ---
 
@@ -144,7 +163,7 @@ AIKnowledgeCMS can function independently, but is designed to integrate cleanly 
 
 - AIRadio
 - Script-based audio or video generation pipelines
-- Other AI-driven media layers
+- AI-driven live distribution layers
 
 By separating knowledge storage from media execution, the system remains reusable, extensible, and resilient.
 
@@ -155,10 +174,11 @@ By separating knowledge storage from media execution, the system remains reusabl
 This project is actively used in a real production environment and continues to evolve.
 
 Current development focuses on:
-- Stability of daily knowledge accumulation
-- Clear separation between knowledge and media layers
 
-Media-related features remain modular and optional by design.
+- Stability of daily knowledge accumulation
+- Refinement of daily summary generation
+- Lightweight, privacy-first tracking
+- Clear separation between knowledge and media layers
 
 ---
 

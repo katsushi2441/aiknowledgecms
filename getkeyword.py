@@ -75,14 +75,201 @@ def extract_keywords(base, max_seeds=DEFAULT_MAX_SEEDS):
     return results
 
 # =========================
+# AI / Ollama : Keyword Type Batch
+# =========================
+class KeywordTypeBatchRequest(BaseModel):
+    keywords: list
+
+@app.post("/keyword_type_batch")
+def keyword_type_batch(req: KeywordTypeBatchRequest):
+
+    if not isinstance(req.keywords, list) or not req.keywords:
+        raise HTTPException(status_code=400, detail="keywords required")
+
+    keywords = [str(k).strip() for k in req.keywords if str(k).strip()]
+    if not keywords:
+        raise HTTPException(status_code=400, detail="empty keywords")
+
+    joined = "\n".join(keywords)
+
+    prompt = f"""
+あなたは用語分類AIです。
+次の単語群を「general」または「technical」に分類してください。
+
+# 単語一覧
+{joined}
+
+# 判定基準
+- 専門知識がない人でも意味が分かる単語は general
+- 中学生でも説明なしに理解できる語は general
+- 特定分野の専門知識がないと意味が分からない語のみ technical
+- general判定は積極的に行う
+- JSONのみ出力
+
+# 出力形式
+[
+  {{"keyword":"単語","type":"general"}},
+  {{"keyword":"単語","type":"technical"}}
+]
+"""
+
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.0
+        }
+    }
+
+    try:
+        r = requests.post(
+            OLLAMA_URL,
+            json=payload,
+            timeout=120
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    text = data.get("response", "").strip()
+
+    import json
+    try:
+        parsed = json.loads(text)
+        if not isinstance(parsed, list):
+            raise Exception("invalid format")
+    except Exception:
+        # 失敗時は全部technical扱い
+        parsed = [{"keyword":k, "type":"technical"} for k in keywords]
+
+    return {
+        "ok": True,
+        "results": parsed
+    }
+
+
+# =========================
+# AI / Ollama : Keyword Type
+# =========================
+class KeywordTypeRequest(BaseModel):
+    keyword: str
+
+@app.post("/keyword_type")
+def keyword_type(req: KeywordTypeRequest):
+
+    keyword = req.keyword.strip()
+    if not keyword:
+        raise HTTPException(status_code=400, detail="keyword required")
+
+    prompt = f"""
+あなたは用語分類AIです。
+
+次の単語が「一般語」か「専門用語」か判定してください。
+
+# 単語
+{keyword}
+
+# 判定基準
+- 日常会話で普通に使われる語は general
+- IT・医療・法律・金融など特定分野で主に使われる語は technical
+- 固有名詞（製品名・技術名）は technical
+- JSONのみ出力
+
+# 出力形式
+{{"type":"general"}} または {{"type":"technical"}}
+"""
+
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.0
+        }
+    }
+
+    try:
+        r = requests.post(
+            OLLAMA_URL,
+            json=payload,
+            timeout=60
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    text = data.get("response", "").strip()
+
+    try:
+        parsed = json.loads(text)
+        t = parsed.get("type", "technical")
+    except Exception:
+        t = "technical"
+
+    if t not in ["general", "technical"]:
+        t = "technical"
+
+    return {
+        "ok": True,
+        "keyword": keyword,
+        "type": t
+    }
+
+
+# =========================
 # AI / Ollama : Daily Summary
 # =========================
 class DailySummaryRequest(BaseModel):
     texts: list
     date: str | None = None
 
+class PromptRequest(BaseModel):
+    prompt: str
+
 @app.post("/daily_summary")
-def daily_summary(req: DailySummaryRequest):
+def daily_summary(req: PromptRequest):
+
+    prompt = req.prompt
+
+    if not prompt or not isinstance(prompt, str):
+        raise HTTPException(status_code=400, detail="prompt required")
+
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.3,
+            "seed": 12345,
+            "top_p": 0.8
+        }
+    }
+
+    try:
+        r = requests.post(
+            OLLAMA_URL,
+            json=payload,
+            timeout=240
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    text = data.get("response", "")
+    if not isinstance(text, str):
+        text = ""
+
+    return {
+        "summary": text.strip()
+    }
+
+
+@app.post("/daily_summary2")
+def daily_summary2(req: DailySummaryRequest):
 
     texts = req.texts
     date  = req.date or ""
