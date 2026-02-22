@@ -1,4 +1,6 @@
 <?php
+$is_public = isset($is_public) ? $is_public : false;
+
 date_default_timezone_set("Asia/Tokyo");
 
 /* ★ FastAPI 版 getkeyword */
@@ -9,6 +11,11 @@ define("DATA_DIR", __DIR__ . "/data");
 define("KEYWORD_JSON", __DIR__ . "/keyword.json");
 define("NEWS_LIMIT", 5);
 define("AIKNOWLEDGE_TOKEN", "秘密の文字列");
+
+/* =========================================================
+   adminモード判定（ここで一度だけ定義）
+========================================================= */
+$is_admin = isset($_GET["admin"]) && $_GET["admin"] === AIKNOWLEDGE_TOKEN;
 
 /* =========================================================
    API : JSON GENERATION (for worker)
@@ -131,6 +138,245 @@ if (isset($_GET["list_json"])) {
     sort($files);
 
     echo json_encode($files, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+/* =========================
+   共通：Liveトレンド取得
+========================= */
+function get_live_trend_keywords($limit = 20){
+
+    global $log_file, $keyword_file;
+
+    $valid_keywords = array();
+
+    if(file_exists($keyword_file)){
+        $json = json_decode(file_get_contents($keyword_file), true);
+
+        if(isset($json["keywords"]) && is_array($json["keywords"])){
+            foreach($json["keywords"] as $k => $v){
+                $valid_keywords[$k] = true;
+            }
+        }
+    }
+
+    $counts = array();
+
+    if(file_exists($log_file)){
+        $lines = file($log_file);
+
+        foreach($lines as $line){
+
+            if(strpos($line, "kw=") === false) continue;
+
+            $parts = explode(" | ", trim($line));
+            if(count($parts) < 5) continue;
+
+            $referrer = $parts[3];
+            $ua       = strtolower($parts[4]);
+
+            if(
+                strpos($ua, "bot") !== false ||
+                strpos($ua, "crawler") !== false ||
+                strpos($ua, "spider") !== false ||
+                strpos($ua, "gptbot") !== false
+            ){
+                continue;
+            }
+
+            if(preg_match('/kw=([^&]+)/', $referrer, $m)){
+                $kw = urldecode($m[1]);
+                $kw = trim($kw);
+
+                if(isset($valid_keywords[$kw])){
+                    if(!isset($counts[$kw])){
+                        $counts[$kw] = 0;
+                    }
+                    $counts[$kw]++;
+                }
+            }
+        }
+    }
+
+    arsort($counts);
+
+    return array_slice($counts, 0, $limit, true);
+}
+
+
+/* =========================
+   API: Liveトレンド取得（aitrendと同一ロジック）
+========================= */
+if(isset($_GET["api_get_trend_keywords"])){
+
+    header("Content-Type: application/json; charset=UTF-8");
+
+    $log_file = __DIR__ . "/access.log";
+    $keyword_file = __DIR__ . "/keyword.json";
+
+    $valid_keywords = array();
+
+    if(file_exists($keyword_file)){
+        $json = json_decode(file_get_contents($keyword_file), true);
+
+        if(isset($json["keywords"]) && is_array($json["keywords"])){
+            foreach($json["keywords"] as $k => $v){
+                $valid_keywords[$k] = true;
+            }
+        }
+    }
+
+    $counts = array();
+
+    if(file_exists($log_file)){
+        $lines = file($log_file);
+
+        foreach($lines as $line){
+
+            if(strpos($line, "kw=") === false) continue;
+
+            $parts = explode(" | ", trim($line));
+            if(count($parts) < 5) continue;
+
+            $referrer = $parts[3];
+            $ua       = strtolower($parts[4]);
+
+            if(
+                strpos($ua, "bot") !== false ||
+                strpos($ua, "crawler") !== false ||
+                strpos($ua, "spider") !== false ||
+                strpos($ua, "gptbot") !== false
+            ){
+                continue;
+            }
+
+            if(preg_match('/kw=([^&]+)/', $referrer, $m)){
+                $kw = urldecode($m[1]);
+                $kw = trim($kw);
+
+                if(isset($valid_keywords[$kw])){
+                    if(!isset($counts[$kw])){
+                        $counts[$kw] = 0;
+                    }
+                    $counts[$kw]++;
+                }
+            }
+        }
+    }
+
+    arsort($counts);
+
+    $top = array_slice($counts, 0, 20, true);
+
+    echo json_encode(array_keys($top));
+    exit;
+}
+
+/* =========================
+   API: keyword info 取得
+========================= */
+if(isset($_GET["api_get_keyword_info"])){
+
+    header("Content-Type: application/json; charset=UTF-8");
+
+    $token   = isset($_GET["token"]) ? $_GET["token"] : "";
+    $keyword = isset($_GET["keyword"]) ? $_GET["keyword"] : "";
+
+    if($token !== "秘密の文字列"){
+        echo json_encode(array("error"=>"invalid_token"));
+        exit;
+    }
+
+    if($keyword === ""){
+        echo json_encode(array("error"=>"empty_keyword"));
+        exit;
+    }
+
+    $file = __DIR__ . "/keyword.json";
+
+    if(!file_exists($file)){
+        echo json_encode(array("keyword"=>$keyword,"description"=>""));
+        exit;
+    }
+
+    $json = json_decode(file_get_contents($file), true);
+
+    if(!$json || !isset($json["keywords"])){
+        echo json_encode(array("keyword"=>$keyword,"description"=>""));
+        exit;
+    }
+
+    if(isset($json["keywords"][$keyword])){
+
+        $desc = isset($json["keywords"][$keyword]["description"])
+            ? $json["keywords"][$keyword]["description"]
+            : "";
+
+        echo json_encode(array(
+            "keyword"     => $keyword,
+            "description" => $desc
+        ));
+
+    }else{
+
+        echo json_encode(array(
+            "keyword"     => $keyword,
+            "description" => ""
+        ));
+    }
+
+    exit;
+}
+
+
+
+if (isset($_POST["api_update_keyword_description"])) {
+
+    header("Content-Type: application/json; charset=utf-8");
+
+    if (
+        !isset($_POST["token"]) ||
+        $_POST["token"] !== AIKNOWLEDGE_TOKEN
+    ) {
+        echo json_encode(array("status"=>"fail","reason"=>"invalid token"));
+        exit;
+    }
+
+    if (
+        !isset($_POST["keyword"]) ||
+        !isset($_POST["description"])
+    ) {
+        echo json_encode(array("status"=>"fail","reason"=>"invalid payload"));
+        exit;
+    }
+
+    $keyword = trim($_POST["keyword"]);
+    $description = trim($_POST["description"]);
+
+    if ($keyword === "" || $description === "") {
+        echo json_encode(array("status"=>"fail","reason"=>"empty value"));
+        exit;
+    }
+
+    $data = load_keyword_json_safe();
+
+    if (!isset($data["keywords"][$keyword])) {
+        echo json_encode(array("status"=>"fail","reason"=>"keyword not found"));
+        exit;
+    }
+
+    $data["keywords"][$keyword]["description"] = $description;
+    $data["keywords"][$keyword]["description_updated_at"] = date("Y-m-d H:i:s");
+
+    file_put_contents(
+        KEYWORD_JSON,
+        json_encode(
+            array("keywords"=>$data["keywords"]),
+            JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT
+        )
+    );
+
+    echo json_encode(array("status"=>"ok"));
     exit;
 }
 
@@ -434,26 +680,26 @@ if (!file_exists(DATA_DIR)) {
 
 function seed_keyword_core($base, $mode = "browser", $depth = 0, &$state = null) {
     $state = initializeStateIfNeeded($state);
-    
+
     // ★ グローバル上限チェック
     if (count($state["added"]) >= 10) {
         return buildResult($state);
     }
-    
+
     $baseAddedCount = processBaseKeyword($base, $state);
-    
+
     // ★ 深さ1を超えたら派生キーワード処理をスキップ
     if ($depth > 1) {
         saveResults($base, $baseAddedCount, $state);
         return buildResult($state);
     }
-    
+
     $derivedKeywords = fetchDerivedKeywords($base);
-    
+
     if ($mode !== "browser" && !empty($derivedKeywords)) {
         processDerivedKeywords($derivedKeywords, $base, $mode, $depth, $state, $baseAddedCount);
     }
-    
+
     saveResults($base, $baseAddedCount, $state);
     return buildResult($state);
 }
@@ -499,16 +745,16 @@ function processBaseKeyword($base, &$state) {
     if (isset($state["tried_map"][$base])) {
         return 0;
     }
-    
+
     $state["tried_map"][$base] = true;
     $baseNews = fetch_google_news($base, $state["today"]);
-    
+
     if ($baseNews) {
         addKeywordIfNew($base, $state);
     } else {
         $state["tried_seeds"][] = $base;
     }
-    
+
     return 0;
 }
 
@@ -536,44 +782,44 @@ function fetchDerivedKeywords($base) {
             "max_seeds" => 2  // ★ 2個まで
         ]
     );
-    
+
     if (!isValidResponse($response)) {
         return [];
     }
-    
+
     $keywords = [];
     foreach ($response["results"] as $row) {
         if (isset($row["keyword"]) && is_string($row["keyword"])) {
             $keywords[] = $row["keyword"];
         }
     }
-    
+
     return array_values(array_unique($keywords));
 }
 
 function isValidResponse($response) {
-    return is_array($response) 
-        && isset($response["results"]) 
+    return is_array($response)
+        && isset($response["results"])
         && is_array($response["results"]);
 }
 
 function processDerivedKeywords($keywords, $base, $mode, $depth, &$state, &$baseAddedCount) {
     shuffle($keywords);
-    
+
     foreach ($keywords as $keyword) {
         // ★ グローバル上限
         if (count($state["added"]) >= 10) {
             break;
         }
-        
+
         if (isset($state["tried_map"][$keyword])) {
             continue;
         }
-        
+
         if (addKeywordIfNew($keyword, $state)) {
             $baseAddedCount++;
         }
-        
+
         // ★ depth+1 で再帰（最大depth=1まで）
         seed_keyword_core($keyword, $mode, $depth + 1, $state);
     }
@@ -583,7 +829,7 @@ function saveResults($base, $baseAddedCount, &$state) {
     if (isset($state["keywords"][$base])) {
         $state["keywords"][$base]["count"] = $baseAddedCount;
     }
-    
+
     file_put_contents(
         KEYWORD_JSON,
         json_encode(
@@ -607,7 +853,7 @@ function buildResult($state) {
 $view_keyword = "";
 if (isset($_GET["kw"])) {
     $view_keyword = trim($_GET["kw"]);
-    
+
     // ★ アクセス数をカウント
     if ($view_keyword !== "") {
         incrementKeywordViews($view_keyword);
@@ -619,17 +865,17 @@ if (isset($_GET["kw"])) {
 ========================================================= */
 function incrementKeywordViews($keyword) {
     $data = load_keyword_json_safe();
-    
+
     // キーワードが存在する場合のみカウント
     if (isset($data["keywords"][$keyword])) {
         // views フィールドがなければ初期化
         if (!isset($data["keywords"][$keyword]["views"])) {
             $data["keywords"][$keyword]["views"] = 0;
         }
-        
+
         // インクリメント
         $data["keywords"][$keyword]["views"]++;
-        
+
         // 保存
         file_put_contents(
             KEYWORD_JSON,
@@ -821,8 +1067,9 @@ $data = load_keyword_json_safe();
 $keywords_data = $data["keywords"];
 
 $keywords = array_keys($data["keywords"]);
+
 /* =========================================================
-   POST : SEED KEYWORD
+   POST : SEED KEYWORD（adminのみ実行可能）
 ========================================================= */
 $today = date("Y-m-d");
 
@@ -831,14 +1078,14 @@ if (isset($_GET["base_date"]) && preg_match("/^\d{4}-\d{2}-\d{2}$/", $_GET["base
     $base_date = $_GET["base_date"];
 }
 
-if (isset($_POST["seed_keyword"])) {
+if (isset($_POST["seed_keyword"]) && $is_admin) {
 
     $base = trim($_POST["seed_keyword"]);
     if ($base !== "") {
         seed_keyword_core($base);
     }
 
-    header("Location: ?kw=" . urlencode($base));
+    header("Location: ?kw=" . urlencode($base) . "&admin=" . urlencode(AIKNOWLEDGE_TOKEN));
     exit;
 }
 
@@ -888,9 +1135,6 @@ function build_results_by_date($keywords, $base_date, $view_keyword = "") {
 /* =========================================================
    JSON GENERATION
 ========================================================= */
-/* =========================================================
-   JSON GENERATION
-========================================================= */
 
 $results = build_results_by_date($keywords, $base_date, $view_keyword);
 
@@ -909,9 +1153,9 @@ if ($view_keyword !== "") {
     $page_title = "「".$view_keyword."」の最新ニュース分析｜AI Knowledge CMS";
 }
 
-$description = "AI Knowledge CMS は、AIが毎日ニュースを収集・要約・分析し、知識として蓄積する自律型ナレッジメディアです。";
+$description = "AI Knowledge CMS は、AIが毎日ニュースを収集・要約・分析し、知識 として蓄積する自律型ナレッジメディアです。";
 if ($view_keyword !== "") {
-    $description = "「".$view_keyword."」に関する最新ニュースをAIが要約・分析。日付別に蓄積された知識を閲覧できます。";
+    $description = "「".$view_keyword."」に関する最新ニュースをAIが要約・分析。 日付別に蓄積された知識を閲覧できます。";
 }
 
 $canonical = "https://aiknowledgecms.exbridge.jp/aiknowledgecms.php";
@@ -919,6 +1163,7 @@ if ($view_keyword !== "") {
     $canonical .= "?kw=" . urlencode($view_keyword) . "&base_date=" . $base_date;
 }
 ?>
+<?php if (!$is_public): ?>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -930,155 +1175,7 @@ if ($view_keyword !== "") {
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="<?php echo h($canonical); ?>">
 
-
-<style>
-body{
-    background:#020617;
-    color:#e5e7eb;
-    font-family:sans-serif;
-    padding:16px
-}
-.keyword{
-    margin-bottom:40px
-}
-.keywords{margin:20px 0;display:flex;flex-wrap:wrap;gap:10px}
-.keywords a{
-    padding:6px 12px;
-    border-radius:999px;
-    background:#111827;
-    border:1px solid #334155;
-    color:#93c5fd;
-    font-size:13px;
-    text-decoration:none
-}
-.keywords a:hover{background:#1e293b}
-.list{margin-top:20px}
-.scroll{
-    display:flex;
-    gap:12px;
-    overflow-x:auto;
-    scroll-snap-type:x mandatory;
-    flex-wrap:nowrap;
-}
-
-.card{
-    width:420px;
-    flex:0 0 420px;
-    background:#111827;
-    padding:14px;
-    border-radius:12px;
-    scroll-snap-align:start;
-}
-
-/* =====================
-   Mobile Overflow Fix
-===================== */
-
-@media (max-width: 600px){
-
-    .scroll{
-        padding-right: 16px; /* スクロール余白 */
-    }
-
-    .card{
-        width: calc(90vw - 64px);
-        flex: 0 0 calc(90vw - 64px);
-        min-width: calc(90vw - 64px);
-    }
-
-    .analysis-text{
-        max-width: 100%;
-        overflow-wrap: break-word;
-        word-break: break-word;
-    }
-}
-
-textarea{
-    width:100%;
-    height:220px;
-    background:#020617;
-    color:#e5e7eb;
-    border:1px solid #334155;
-    border-radius:10px;
-    padding:10px
-}
-.title{
-    font-weight:700
-}
-.muted{
-    font-size:13px;
-    color:#94a3b8
-}
-a{
-    color:#38bdf8
-}
-
-/* Thinking Overlay */
-#thinking-overlay{
-    position:fixed;
-    inset:0;
-    background:rgba(2,6,23,0.85);
-    display:none;
-    align-items:center;
-    justify-content:center;
-    z-index:9999
-}
-#thinking-box{
-    background:#111827;
-    border:1px solid #334155;
-    border-radius:14px;
-    padding:24px 32px;
-    text-align:center
-}
-#thinking-title{
-    font-size:18px;
-    font-weight:700;
-    margin-bottom:8px
-}
-#thinking-sub{
-    font-size:13px;
-    color:#94a3b8
-}
-#loading-indicator {
-    text-align: center;
-    padding: 20px;
-    color: #94a3b8;
-    display: none;
-}
-
-#loading-indicator.show {
-    display: block;
-}
-/* =====================
-   Heading Size Normalize
-===================== */
-
-/* H1：ページタイトル（普通サイズ） */
-h1{
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1.4;
-  margin: 24px 0 16px;
-}
-
-/* H3：セクション見出し（本文より少し大きい程度） */
-h3{
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1.5;
-  margin: 16px 0 8px;
-}
-
-</style>
-<script>
-(function(){
-    var s = document.createElement('script');
-    s.src = 'https://aiknowledgecms.exbridge.jp/simpletrack.php'
-          + '?url=' + encodeURIComponent(location.href)
-          + '&ref=' + encodeURIComponent(document.referrer);
-    document.head.appendChild(s);
-})();
-</script>
+<link rel="stylesheet" href="./style.css">
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-BP0650KDFR"></script>
 <script>
@@ -1088,9 +1185,21 @@ h3{
   gtag('config', 'G-BP0650KDFR');
 </script>
 </head>
-<body>
+<body data-view-keyword="<?php echo h($view_keyword); ?>">
+<?php endif; ?>
 
-<a href="./aiknowledgecms.php"><img src="./images/aiknowledgecms_logo.png" width="25%"></a><br>
+<div class="header-bar">
+
+  <a href="./aiknowledgecms.php<?php echo $is_admin ? '?admin=' . urlencode(AIKNOWLEDGE_TOKEN) : ''; ?>" class="cms-logo">
+ <img src="./images/aiknowledgecms_logo.png"></a>
+
+  <a href="./aitrend.php" class="aitrend-link">
+    <img src="./images/aitrend_logo.png">
+    <span class="aitrend-text">AIトレンドキーワード</span>
+  </a>
+
+</div>
+
 <h1>AI Knowledge CMS｜AIが毎日ニュースを分析・蓄積する知識メディア</h1>
 
 <div id="thinking-overlay">
@@ -1100,8 +1209,8 @@ h3{
     </div>
 </div>
 
+<?php if ($is_admin): ?>
 <h3>入力したキーワードで本日のニュースを検索し要約します</h3>
-
 <form method="post" onsubmit="showThinking()">
     <input
         type="text"
@@ -1111,6 +1220,7 @@ h3{
     >
     <button type="submit">生成</button>
 </form>
+<?php endif; ?>
 
 <div class="keywords">
 <?php
@@ -1135,7 +1245,7 @@ usort($today_keywords, function($a, $b) use ($data) {
 });
 
 // ★ 上位20件
-$today_keywords = array_slice($today_keywords, 0, 20);
+$today_keywords = array_slice($today_keywords, 0, 30);
 
 foreach ($today_keywords as $kw):
 ?>
@@ -1155,10 +1265,10 @@ $can_next  = ($next_date <= $today);
 ?>
 
 <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px">
-    <a href="?base_date=<?php echo h($prev_date); ?><?php if($view_keyword) echo "&kw=".h($view_keyword); ?>">←</a>
+    <a href="?base_date=<?php echo h($prev_date); ?><?php if($is_admin) echo "&admin=".h(AIKNOWLEDGE_TOKEN); ?>">←</a>
     <strong><?php echo h($base_date); ?></strong>
     <?php if ($can_next): ?>
-        <a href="?base_date=<?php echo h($next_date); ?><?php if($view_keyword) echo "&kw=".h($view_keyword); ?>">→</a> <a href="./daily_summary.php">サマリー</a>
+        <a href="?base_date=<?php echo h($next_date); ?><?php if($is_admin) echo "&admin=".h(AIKNOWLEDGE_TOKEN); ?>">→</a> <a href="./daily_summary.php">サマリー</a>
     <?php else: ?>
         <span style="opacity:.3">→</span>
     <?php endif; ?>
@@ -1170,7 +1280,7 @@ $can_next  = ($next_date <= $today);
 <div class="keyword" id="keyword-<?php echo h(urlencode($keyword)); ?>">
 
 <h3>
-  <a href="?kw=<?php echo h($keyword); ?>&base_date=<?php echo h($base_date); ?>">
+  <a href="?kw=<?php echo h($keyword); ?>&base_date=<?php echo h($base_date); ?><?php if($is_admin) echo "&admin=".h(AIKNOWLEDGE_TOKEN); ?>">
     <?php echo h($keyword); ?>
   </a>
   <span style="font-size:13px;color:#94a3b8;font-weight:normal;">
@@ -1214,71 +1324,9 @@ Googleニュースを開く
 <?php endif; ?>
 
 
-
-<script>
-// ★ 無限スクロール実装
-(function() {
-    // キーワード指定がある場合は無限スクロール不要
-    <?php if ($view_keyword !== ""): ?>
-    return;
-    <?php endif; ?>
-    
-    const keywords = document.querySelectorAll('.keyword');
-    let currentIndex = 30;  // 最初に表示する件数
-    
-    // 最初は5件のみ表示
-    keywords.forEach((kw, index) => {
-        if (index >= currentIndex) {
-            kw.style.display = 'none';
-        }
-    });
-    
-    // スクロールイベント
-    let loading = false;
-    
-    window.addEventListener('scroll', function() {
-        if (loading) return;
-        if (currentIndex >= keywords.length) return;
-        
-        // 画面下部に近づいたら
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-        const windowHeight = window.innerHeight;
-        const documentHeight = document.documentElement.scrollHeight;
-        
-        if (scrollTop + windowHeight >= documentHeight - 500) {
-            loading = true;
-            
-            // 次の5件を表示
-            const nextIndex = Math.min(currentIndex + 5, keywords.length);
-            for (let i = currentIndex; i < nextIndex; i++) {
-                keywords[i].style.display = 'block';
-            }
-            currentIndex = nextIndex;
-            
-            setTimeout(() => {
-                loading = false;
-            }, 300);
-        }
-    });
-})();
-
-function showThinking(){
-    // 既存のコード
-    var overlay = document.getElementById("thinking-overlay");
-    if(overlay){
-        overlay.style.display = "flex";
-    }
-
-    setTimeout(function(){
-        var els = document.querySelectorAll("input, button, textarea");
-        els.forEach(function(e){
-            e.disabled = true;
-        });
-    }, 0);
-
-    return true;
-}
-</script>
+<script src="./script.js"></script>
+<?php if (!$is_public): ?>
 </body>
 </html>
+<?php endif; ?>
 

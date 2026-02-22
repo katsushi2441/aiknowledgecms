@@ -13,7 +13,7 @@ KEYWORD_JSON_URL = BASE_URL + "/keyword.json"
 AIKNOWLEDGE_API = BASE_URL + "/aiknowledgecms.php"
 DATA_DIR = "/var/www/html/aiknowledgecms/data"
 CHECK_INTERVAL = 1
-MAX_DAILY_KEYWORDS = 50
+MAX_DAILY_KEYWORDS = 100
 TOKEN = "秘密の文字列"
 
 # =====================
@@ -144,6 +144,10 @@ while True:
         if today_created >= MAX_DAILY_KEYWORDS:
             log("[RUN] Executing aiknowledgecms.py")
             subprocess.run(["python3", "aiknowledgecms.py"])
+
+            log("[RUN] Executing aitrend.py")
+            subprocess.run(["python3", "aitrend.py"])
+
             wait_until_next_day()
             continue
 

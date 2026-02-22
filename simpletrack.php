@@ -47,24 +47,20 @@ if(isset($_GET["dashboard"])){
     arsort($url_count);
     arsort($ref_count);
 
-    $decoded_urls = array();
-    foreach(array_slice($url_count,0,10,true) as $u=>$c){
-        $decoded_urls[urldecode($u)] = $c;
-    }
-
-    $decoded_refs = array();
-    foreach(array_slice($ref_count,0,10,true) as $r=>$c){
-        $decoded_refs[$r] = $c;
-    }
+    // 上位50件をそのまま使う（urldecodeしない→キー重複・上書き防止）
+    $top_urls = array_slice($url_count, 0, 20, true);
+    $top_urls50 = array_slice($url_count, 0, 150, true);
+    $top_refs = array_slice($ref_count, 0, 20, true);
 
     $dates      = json_encode(array_keys($pv_per_day));
     $pv_counts  = json_encode(array_values($pv_per_day));
 
-    $url_labels = json_encode(array_keys($decoded_urls), JSON_UNESCAPED_UNICODE);
-    $url_counts = json_encode(array_values($decoded_urls));
+    // グラフ用：ラベルはurldecodeして日本語表示
+    $url_labels = json_encode(array_map('urldecode', array_keys($top_urls)), JSON_UNESCAPED_UNICODE);
+    $url_counts = json_encode(array_values($top_urls));
 
-    $ref_labels = json_encode(array_keys($decoded_refs), JSON_UNESCAPED_UNICODE);
-    $ref_counts = json_encode(array_values($decoded_refs));
+    $ref_labels = json_encode(array_map('urldecode', array_keys($top_refs)), JSON_UNESCAPED_UNICODE);
+    $ref_counts = json_encode(array_values($top_refs));
 ?>
 <!DOCTYPE html>
 <html>
@@ -131,8 +127,8 @@ canvas{
 <tr><th>#</th><th>URL</th><th>PV</th></tr>
 <?php
 $i = 1;
-foreach(array_slice($decoded_urls,0,50,true) as $u=>$c){
-    echo "<tr><td>".$i."</td><td>".htmlspecialchars($u)."</td><td>".$c."</td></tr>";
+foreach($top_urls50 as $u=>$c){
+    echo "<tr><td>".$i."</td><td>".htmlspecialchars(urldecode($u))."</td><td>".$c."</td></tr>";
     $i++;
 }
 ?>
@@ -140,6 +136,9 @@ foreach(array_slice($decoded_urls,0,50,true) as $u=>$c){
 </div>
 
 <script>
+Chart.defaults.color = '#ffffff';
+Chart.defaults.borderColor = '#334155';
+
 new Chart(document.getElementById('pvChart'),{
     type:'line',
     data:{

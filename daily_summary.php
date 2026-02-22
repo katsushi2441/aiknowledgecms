@@ -7,6 +7,12 @@ $debug_info = array();
    設定
 ===================== */
 define("DAILY_SUMMARY_API", "http://exbridge.ddns.net:8003/daily_summary");
+define("AIKNOWLEDGE_TOKEN", "秘密の文字列");
+
+/* =====================
+   adminモード判定
+===================== */
+$is_admin = isset($_GET["admin"]) && $_GET["admin"] === AIKNOWLEDGE_TOKEN;
 
 $data_dir     = __DIR__ . "/data";
 $keyword_file = __DIR__ . "/keyword.json";
@@ -62,7 +68,7 @@ function http_post_json($url, $payload, $timeout = 180) {
    保存処理（手動編集）
 ===================== */
 $saved = false;
-if (isset($_POST["save_summary"])) {
+if (isset($_POST["save_summary"]) && $is_admin) {
 
     $text = isset($_POST["summary_text"])
         ? trim($_POST["summary_text"])
@@ -87,7 +93,7 @@ if (isset($_POST["save_summary"])) {
 /* =====================
    削除処理
 ===================== */
-if (isset($_POST["delete_summary"])) {
+if (isset($_POST["delete_summary"]) && $is_admin) {
 
     if ($base_date < $today) {
 
@@ -100,7 +106,7 @@ if (isset($_POST["delete_summary"])) {
         }
 
         // 画面リロード
-        header("Location: ?date=" . $base_date);
+        header("Location: ?date=" . $base_date . ($is_admin ? "&admin=" . urlencode(AIKNOWLEDGE_TOKEN) : ""));
         exit;
     }
 }
@@ -154,7 +160,7 @@ if (!$saved && file_exists($summary_file)) {
 
         foreach ($files as $f) {
 
-            if ($limit_count >= 10) {
+            if ($limit_count >= 5) {
                 break;
             }
 
@@ -266,7 +272,7 @@ if (file_exists($keyword_file)) {
     $json = json_decode(file_get_contents($keyword_file), true);
 
     if (isset($json["keywords"]) && is_array($json["keywords"])) {
-        
+
         // ★ キーワードは連想配列のキーとして取得
         foreach ($json["keywords"] as $kw => $kw_data) {
             $kw = trim($kw);
@@ -274,7 +280,7 @@ if (file_exists($keyword_file)) {
 
             // ★ 該当日のこのキーワードのjsonが存在するか確認
             $pattern = $data_dir . "/" . $base_date . "_" . $kw . ".json";
-            
+
             if (file_exists($pattern)) {
                 $keywords[] = $kw;
             }
@@ -427,7 +433,7 @@ if (empty($debug_info)) {
 </div>
 -->
 
-<a href="?date=<?php echo h($yesterday); ?>">
+<a href="?date=<?php echo h($yesterday); ?><?php if($is_admin) echo "&admin=".h(AIKNOWLEDGE_TOKEN); ?>">
 <img src="./images/aiknowledgecms_logo.png" width="25%" height="25%">
 </a>
 <h1>AI Knowledge CMS｜AIが毎日ニュースを分析・蓄積する知識メディア</h1>
@@ -457,10 +463,10 @@ if (empty($debug_info)) {
 $prev = date("Y-m-d", strtotime($base_date." -1 day"));
 $next = date("Y-m-d", strtotime($base_date." +1 day"));
 ?>
-<a href="?date=<?php echo h($prev); ?>">← 前日</a>
+<a href="?date=<?php echo h($prev); ?><?php if($is_admin) echo "&admin=".h(AIKNOWLEDGE_TOKEN); ?>">← 前日</a>
 <span class="date"><?php echo h($base_date); ?></span>
 <?php if ($next <= $today): ?>
-<a href="?date=<?php echo h($next); ?>">翌日 →</a>
+<a href="?date=<?php echo h($next); ?><?php if($is_admin) echo "&admin=".h(AIKNOWLEDGE_TOKEN); ?>">翌日 →</a>
 <?php endif; ?>
 </div>
 
@@ -480,12 +486,13 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
 </div>
 <?php endif; ?>
 
+<?php if ($is_admin): ?>
 <form method="post" onsubmit="showThinking()">
     <textarea name="summary_text"><?php echo h($summary_text); ?></textarea>
     <button type="submit" name="save_summary" value="1">保存</button>
 
 <?php if ($base_date < $today): ?>
-    <button type="submit" name="delete_summary" value="1" 
+    <button type="submit" name="delete_summary" value="1"
     style="background:#b91c1c;margin-left:10px;"
     onclick="return confirm('本当に削除しますか？');">
     削除
@@ -493,6 +500,9 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
 <?php endif; ?>
 
 </form>
+<?php else: ?>
+<textarea readonly><?php echo h($summary_text); ?></textarea>
+<?php endif; ?>
 
 
 <?php if (count($daily_list) > 0): ?>
@@ -501,7 +511,7 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
 <div class="list">
 <?php foreach ($daily_list as $d): ?>
 <div class="row">
-    <a href="?date=<?php echo h($d["date"]); ?>">
+    <a href="?date=<?php echo h($d["date"]); ?><?php if($is_admin) echo "&admin=".h(AIKNOWLEDGE_TOKEN); ?>">
         <?php echo h($d["date"]); ?>
     </a>
 
