@@ -13,7 +13,7 @@ KEYWORD_JSON_URL = BASE_URL + "/keyword.json"
 AIKNOWLEDGE_API = BASE_URL + "/aiknowledgecms.php"
 DATA_DIR = "/var/www/html/aiknowledgecms/data"
 CHECK_INTERVAL = 1
-MAX_DAILY_KEYWORDS = 100
+MAX_DAILY_KEYWORDS = 200
 TOKEN = "秘密の文字列"
 
 # =====================
@@ -70,9 +70,27 @@ def wait_until_next_day():
 # =====================
 log("===== AIKnowledgeCMS worker started =====")
 
+last_daily_run_date = None
+
 while True:
     try:
         log("----- LOOP START -----")
+
+        current_date = today()
+        if last_daily_run_date != current_date:
+            log(f"[DAILY] New day detected ({current_date}), running aiknowledgecms.py")
+            result = subprocess.run(
+                ["python3", "aiknowledgecms.py"],
+                capture_output=True,
+                text=True
+            )
+            if result.stdout:
+                for line in result.stdout.strip().splitlines():
+                    log(line)
+            if result.stderr:
+                for line in result.stderr.strip().splitlines():
+                    log(f"[STDERR] {line}")
+            last_daily_run_date = current_date
 
         data = load_keyword_json()
         keywords_dict = data.get("keywords", {})

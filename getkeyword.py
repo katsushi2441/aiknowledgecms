@@ -2,17 +2,29 @@
 # -*- coding: utf-8 -*-
 
 import sys
+import json
 import argparse
 import urllib.parse
 import hashlib
+import os
+import uuid
+import threading
+import subprocess
+import logging
+from pathlib import Path
+from typing import Optional
 
 import feedparser
 import requests
 
 # FastAPI（APIモード用）
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import uvicorn
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger(__name__)
 
 DEFAULT_NEWS_LIMIT = 5
 DEFAULT_MAX_SEEDS = 10
@@ -135,13 +147,11 @@ def keyword_type_batch(req: KeywordTypeBatchRequest):
 
     text = data.get("response", "").strip()
 
-    import json
     try:
         parsed = json.loads(text)
         if not isinstance(parsed, list):
             raise Exception("invalid format")
     except Exception:
-        # 失敗時は全部technical扱い
         parsed = [{"keyword":k, "type":"technical"} for k in keywords]
 
     return {
@@ -503,6 +513,161 @@ def getkeyword_api(req: KeywordRequest):
     }
 
 
+# ============================
+# OmniVoice TTS
+# ============================
+_OV_BASE_DIR    = Path(os.environ.get("OMNIVOICE_DIR", str(Path.home() / "OmniVoice")))
+_OV_PYTHON      = str(_OV_BASE_DIR / "venv" / "bin" / "python3")
+_OV_RESULTS_DIR = _OV_BASE_DIR / "results"
+_OV_WORK_DIR    = _OV_BASE_DIR / "work"
+_OV_DEFAULT_REF = str(_OV_BASE_DIR / "ref_audio" / "default.wav")
+_OV_MODEL       = os.environ.get("OMNIVOICE_MODEL", "k2-fsa/OmniVoice")
+
+_OV_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+_OV_WORK_DIR.mkdir(parents=True, exist_ok=True)
+
+# job管理: job_id -> {status, text, wav, error}
+_ov_jobs: dict = {}
+_ov_lock = threading.Lock()
+
+
+class OmniVoiceTTSRequest(BaseModel):
+    text: str
+    ref_audio: Optional[str] = None
+    job_id: Optional[str] = None
+
+
+def _ov_job_id(text: str) -> str:
+    return "ov_" + hashlib.md5(text.encode()).hexdigest()[:12]
+
+
+def _ov_find_wav(res_dir: Path, job_id: str) -> Optional[Path]:
+    c = res_dir / f"{job_id}.wav"
+    if c.exists():
+        return c
+    wavs = list(res_dir.rglob("*.wav"))
+    if wavs:
+        return sorted(wavs, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+    return None
+
+
+def _ov_run(job_id: str, text: str, ref_audio: str):
+    log.info(f"[ov:{job_id}] start text={text[:30]!r}")
+    with _ov_lock:
+        _ov_jobs[job_id]["status"] = "running"
+
+    res_dir   = _OV_RESULTS_DIR / job_id
+    res_dir.mkdir(parents=True, exist_ok=True)
+    jsonl_path = _OV_WORK_DIR / f"{job_id}.jsonl"
+    jsonl_path.write_text(
+        json.dumps({"id": job_id, "text": text, "ref_audio": ref_audio}, ensure_ascii=False) + "\n",
+        encoding="utf-8"
+    )
+
+    cmd = [
+        _OV_PYTHON, "-m", "omnivoice.cli.infer_batch",
+        "--model", _OV_MODEL,
+        "--test_list", str(jsonl_path),
+        "--res_dir", str(res_dir),
+    ]
+    log.info(f"[ov:{job_id}] cmd={' '.join(cmd)}")
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=str(_OV_BASE_DIR))
+        log.info(f"[ov:{job_id}] rc={result.returncode}")
+        if result.stderr:
+            log.warning(f"[ov:{job_id}] stderr={result.stderr[-400:]}")
+        if result.returncode != 0:
+            raise RuntimeError(f"rc={result.returncode} {result.stderr[-200:]}")
+
+        wav = _ov_find_wav(res_dir, job_id)
+        if not wav:
+            raise RuntimeError(f"WAV not found in {res_dir}")
+
+        with _ov_lock:
+            _ov_jobs[job_id]["status"] = "done"
+            _ov_jobs[job_id]["wav"]    = str(wav)
+        log.info(f"[ov:{job_id}] done wav={wav}")
+
+    except subprocess.TimeoutExpired:
+        with _ov_lock:
+            _ov_jobs[job_id]["status"] = "error"
+            _ov_jobs[job_id]["error"]  = "timeout(180s)"
+        log.error(f"[ov:{job_id}] timeout")
+    except Exception as e:
+        with _ov_lock:
+            _ov_jobs[job_id]["status"] = "error"
+            _ov_jobs[job_id]["error"]  = str(e)
+        log.error(f"[ov:{job_id}] error={e}")
+
+
+@app.post("/tts")
+def tts_submit(req: OmniVoiceTTSRequest):
+    """TTS推論ジョブ投入（非同期）"""
+    if not req.text.strip():
+        raise HTTPException(status_code=400, detail="text is empty")
+
+    job_id    = req.job_id or _ov_job_id(req.text)
+    ref_audio = req.ref_audio or _OV_DEFAULT_REF
+
+    with _ov_lock:
+        existing = _ov_jobs.get(job_id)
+
+    if existing:
+        if existing["status"] == "done":
+            return {"job_id": job_id, "status": "done", "message": "cached"}
+        if existing["status"] in ("pending", "running"):
+            return {"job_id": job_id, "status": existing["status"], "message": "already queued"}
+
+    with _ov_lock:
+        _ov_jobs[job_id] = {"status": "pending", "text": req.text, "wav": None, "error": None}
+
+    threading.Thread(target=_ov_run, args=(job_id, req.text, ref_audio), daemon=True).start()
+    return {"job_id": job_id, "status": "pending", "message": "queued"}
+
+
+@app.get("/tts/{job_id}/status")
+def tts_status(job_id: str):
+    """ジョブステータス確認"""
+    with _ov_lock:
+        j = _ov_jobs.get(job_id)
+    if not j:
+        raise HTTPException(status_code=404, detail="job not found")
+    return {"job_id": job_id, "status": j["status"], "error": j.get("error"), "wav": j.get("wav")}
+
+
+@app.get("/tts/{job_id}/audio")
+def tts_audio(job_id: str):
+    """生成済みWAVダウンロード"""
+    with _ov_lock:
+        j = _ov_jobs.get(job_id)
+    if not j:
+        raise HTTPException(status_code=404, detail="job not found")
+    if j["status"] != "done":
+        raise HTTPException(status_code=202, detail=f"not ready: {j['status']}")
+    wav = j.get("wav")
+    if not wav or not Path(wav).exists():
+        raise HTTPException(status_code=404, detail="wav file missing")
+    return FileResponse(wav, media_type="audio/wav", filename=f"{job_id}.wav")
+
+
+@app.delete("/tts/{job_id}")
+def tts_delete(job_id: str):
+    """ジョブ＆キャッシュ削除"""
+    with _ov_lock:
+        j = _ov_jobs.pop(job_id, None)
+    if not j:
+        raise HTTPException(status_code=404, detail="job not found")
+    if j.get("wav") and Path(j["wav"]).exists():
+        Path(j["wav"]).unlink(missing_ok=True)
+    return {"deleted": job_id}
+
+
+@app.get("/tts/health")
+def tts_health():
+    """OmniVoice動作確認"""
+    return {"status": "ok", "model": _OV_MODEL}
+
 
 # ----------------------------
 # News
@@ -587,6 +752,3 @@ def run_api():
 
 if __name__ == "__main__":
     run_api()
-
-
-

@@ -35,6 +35,28 @@ $summary_file = $data_dir . "/" . $base_date . "_daily_summary.json";
 $audio_file   = $data_dir . "/" . $base_date . "_daily_summary.wav";
 $audio_url    = "./data/" . $base_date . "_daily_summary.wav";
 
+if(isset($_GET["api_get_daily_summary"])){
+
+    header("Content-Type: application/json; charset=UTF-8");
+
+    if(!isset($_GET["token"]) || $_GET["token"] !== AIKNOWLEDGE_TOKEN){
+        echo json_encode(array());
+        exit;
+    }
+
+    $date = isset($_GET["date"]) ? $_GET["date"] : date("Y-m-d", strtotime("-1 day"));
+
+    $file = $data_dir . "/" . $date . "_daily_summary.json";
+
+    if(!file_exists($file)){
+        echo json_encode(array());
+        exit;
+    }
+
+    echo file_get_contents($file);
+    exit;
+}
+
 /* =====================
    Utility
 ===================== */
@@ -139,9 +161,6 @@ if (!$saved && file_exists($summary_file)) {
     /* =====================
        当日分 知識JSON収集
     ===================== */
-    /* =====================
-       当日分 知識JSON収集
-    ===================== */
     $knowledge_texts = array();
 
     // ★ keyword.json から統計取得
@@ -158,27 +177,50 @@ if (!$saved && file_exists($summary_file)) {
 
         $limit_count = 0;
 
-        foreach ($files as $f) {
+        // ★ まず対象ファイルを created_at 付きで配列化
+        $targets = array();
 
-            if ($limit_count >= 5) {
-                break;
-            }
+        foreach ($files as $f) {
 
             if (preg_match("/_daily_summary\.json$/", $f)) {
                 continue;
             }
 
-            // ★ ファイル名からキーワード抽出
             if (!preg_match("/\d{4}-\d{2}-\d{2}_(.+)\.json$/", $f, $m)) {
                 continue;
             }
 
             $kw = $m[1];
 
-            // ★ keyword.json に存在しない場合は除外
             if (!isset($keyword_master[$kw])) {
                 continue;
             }
+
+            $created = isset($keyword_master[$kw]["created_at"])
+                ? $keyword_master[$kw]["created_at"]
+                : "1970-01-01 00:00:00";
+
+            $targets[] = array(
+                "file" => $f,
+                "kw"   => $kw,
+                "created_at" => $created
+            );
+        }
+
+        // ★ created_at の新しい順に並び替え
+        usort($targets, function($a, $b){
+            return strcmp($b["created_at"], $a["created_at"]);
+        });
+
+        // ★ ソート後に処理
+        foreach ($targets as $item) {
+
+            if ($limit_count >= 5) {
+                break;
+            }
+
+            $f  = $item["file"];
+            $kw = $item["kw"];
 
             // ★ views > 0 && count > 0 条件
             if (
@@ -197,10 +239,8 @@ if (!$saved && file_exists($summary_file)) {
                 $knowledge_texts[] = trim($data["analysis"]);
                 $limit_count++;
             }
-
         }
     }
-
     /* =====================
        API 要約生成
     ===================== */
@@ -318,19 +358,35 @@ usort($daily_list, function($a, $b) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title><?php echo h($base_date); ?>｜AIニュース要約・生成AI動向まとめ</title>
+<meta name="description" content="<?php echo h($base_date); ?>のAIニュースをAIが分析・要約。生成AI・LLM・企業動向などを横断的にまとめた日次レポート。">
+<link rel="canonical" href="./daily_summary.php?date=<?php echo h($base_date); ?>">
+<meta name="robots" content="index,follow">
 <style>
+.aitrend-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.aitrend-link img {
+    width: 32px;
+    height: auto;
+}
 /* Thinking Overlay */
 #thinking-overlay{
     position:fixed;
     inset:0;
-    background:rgba(2,6,23,0.85);
+    background:rgba(241,245,249,0.95);
     display:none;
     align-items:center;
     justify-content:center;
     z-index:9999
 }
 #thinking-box{
-    background:#111827;
+    background:#ffffff;
     border:1px solid #334155;
     border-radius:14px;
     padding:24px 32px;
@@ -343,7 +399,7 @@ usort($daily_list, function($a, $b) {
 }
 #thinking-sub{
     font-size:13px;
-    color:#94a3b8
+    color:#64748b
 }
 #loading-indicator {
     text-align: center;
@@ -362,10 +418,10 @@ h1{
   line-height: 1.4;
   margin: 24px 0 16px;
 }
-body{background:#020617;color:#e5e7eb;font-family:sans-serif;padding:16px}
-textarea{width:100%;height:240px;background:#020617;color:#e5e7eb;border:1px solid #334155;border-radius:12px;padding:12px}
-button{margin-top:12px;padding:10px 16px;border-radius:10px;border:0;background:#2563eb;color:#fff}
-.date{color:#94a3b8;margin-bottom:12px}
+body{background:#f1f5f9;color:#e5e7eb;font-family:sans-serif;padding:16px}
+textarea{width:100%;height:240px;background:#f1f5f9;color:#e5e7eb;border:1px solid #334155;border-radius:12px;padding:12px}
+button{margin-top:12px;padding:10px 16px;border-radius:10px;border:0;background:#6d28d9;color:#1e293b}
+.date{color:#64748b;margin-bottom:12px}
 .nav{margin-bottom:16px}
 .nav a{color:#38bdf8;margin-right:12px}
 .audio{margin:16px 0}
@@ -373,16 +429,16 @@ button{margin-top:12px;padding:10px 16px;border-radius:10px;border:0;background:
 .keywords a{
     padding:6px 12px;
     border-radius:999px;
-    background:#111827;
+    background:#ffffff;
     border:1px solid #334155;
     color:#93c5fd;
     font-size:13px;
     text-decoration:none
 }
-.keywords a:hover{background:#1e293b}
+.keywords a:hover{background:#f8fafc}
 .list{margin-top:20px}
 .row{display:flex;align-items:center;gap:12px;margin-bottom:8px}
-.playall{background:#16a34a}
+.playall{background:#059669}
 audio{
     width:100%;
     max-width:600px;
@@ -409,6 +465,23 @@ audio{
 }
 
 </style>
+
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@type": "Article",
+ "headline": "<?php echo h($base_date); ?>のAIニュース要約",
+ "datePublished": "<?php echo h($base_date); ?>",
+ "author": {
+   "@type": "Organization",
+   "name": "AIKnowledgeCMS"
+ },
+ "publisher": {
+   "@type": "Organization",
+   "name": "AIKnowledgeCMS"
+ }
+}
+</script>
 </head>
 <body>
 <!--
@@ -416,7 +489,7 @@ audio{
     margin-bottom:16px;
     padding:12px;
     border-radius:10px;
-    background:#1f2937;
+    background:#f8fafc;
     color:#fca5a5;
     font-size:13px;
     line-height:1.6;
@@ -433,10 +506,34 @@ if (empty($debug_info)) {
 </div>
 -->
 
-<a href="?date=<?php echo h($yesterday); ?><?php if($is_admin) echo "&admin=".h(AIKNOWLEDGE_TOKEN); ?>">
-<img src="./images/aiknowledgecms_logo.png" width="25%" height="25%">
+<div class="header-bar">
+<a href="?date=<?php echo h($yesterday); ?><?php if($is_admin) echo "&admin=".h(AIKNOWLEDGE_TOKEN); ?>" class="cms-logo">
+<img src="./images/aiknowledgecms_logo.png">
 </a>
-<h1>AI Knowledge CMS｜AIが毎日ニュースを分析・蓄積する知識メディア</h1>
+
+  <a href="./newskeyword.php" class="aitrend-link">
+    <img src="./images/newskeyword_logo.png">
+    <span class="aitrend-text">AI思考のキーワード＆ニュース</span>
+  </a>
+
+  <a href="./aitrend.php" class="aitrend-link">
+    <img src="./images/aitrend_logo.png">
+    <span class="aitrend-text">AIトレンドキーワード辞典</span>
+  </a>
+
+  <a href="./simpletrack.php?dashboard=1" class="aitrend-link">
+    <img src="./images/aiwebanalytics_logo.png">
+    <span class="aitrend-text">AI Web Analytics</span>
+  </a>
+
+</div>
+
+<h1><?php echo h($base_date); ?>のAIニュース要約レポート</h1>
+<p>
+本ページは<?php echo h($base_date); ?>に収集されたAI関連ニュースを、
+AIが分析し要約した日次レポートです。
+生成AI、LLM、AI企業動向などを横断的に把握できます。
+</p>
 
 <div id="thinking-overlay">
     <div id="thinking-box">
@@ -451,7 +548,7 @@ if (empty($debug_info)) {
     margin-bottom:16px;
     padding:10px 14px;
     border-radius:10px;
-    background:#064e3b;
+    background:#d1fae5;
     color:#6ee7b7;
     font-size:14px;
 ">
@@ -473,7 +570,7 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
 <?php if (count($keywords) > 0): ?>
 <div class="keywords">
 <?php foreach ($keywords as $kw): ?>
-<a href="https://aiknowledgecms.exbridge.jp/aiknowledgecms.php?base_date=<?php echo h($base_date); ?>&kw=<?php echo h(urlencode($kw)); ?>">
+<a href="./aiknowledgecms.php?base_date=<?php echo h($base_date); ?>&kw=<?php echo h(urlencode($kw)); ?>">
 <?php echo h($kw); ?>
 </a>
 <?php endforeach; ?>
@@ -488,8 +585,10 @@ $next = date("Y-m-d", strtotime($base_date." +1 day"));
 
 <?php if ($is_admin): ?>
 <form method="post" onsubmit="showThinking()">
-    <textarea name="summary_text"><?php echo h($summary_text); ?></textarea>
-    <button type="submit" name="save_summary" value="1">保存</button>
+<div class="summary-text">
+<?php echo nl2br(h($summary_text)); ?>
+</div>    
+<button type="submit" name="save_summary" value="1">保存</button>
 
 <?php if ($base_date < $today): ?>
     <button type="submit" name="delete_summary" value="1"

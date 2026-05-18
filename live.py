@@ -7,7 +7,8 @@ import os
 
 BASE_URL = "https://aiknowledgecms.exbridge.jp/data"
 RTMP_URL = "rtmp://localhost/live/airadio"
-MAX_DAYS = 10
+IMAGE_PATH = "images/airadio_sleep.png"
+MAX_DAYS = 20
 
 def get_latest_urls():
     urls = []
@@ -34,9 +35,16 @@ def stream(url):
     cmd = [
         "ffmpeg",
         "-re",
+        "-loop", "1",
+        "-i", IMAGE_PATH,
         "-i", url,
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-tune", "stillimage",
+        "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "128k",
+        "-shortest",
         "-f", "flv",
         RTMP_URL
     ]
@@ -61,4 +69,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
