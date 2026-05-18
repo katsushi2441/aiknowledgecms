@@ -1,1660 +1,388 @@
 <?php
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// API: 考察タイムライン取得（重複排除・キーワードごと最新1件）
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-if (isset($_GET['action']) && $_GET['action'] === 'timeline') {
-    header('Content-Type: application/json; charset=UTF-8');
-    $account = isset($_GET['account']) ? trim($_GET['account']) : '';
-    if (!$account) {
-        echo json_encode(array('ok' => false, 'reason' => 'no_account'));
-        exit;
-    }
-    $file = __DIR__ . '/data/keyword_' . preg_replace('/[^a-zA-Z0-9_]/', '', $account) . '.json';
-    if (!file_exists($file)) {
-        echo json_encode(array('ok' => false, 'reason' => 'no_keyword_file'));
-        exit;
-    }
-    $kdata    = json_decode(file_get_contents($file), true);
-    $keywords = isset($kdata['keywords']) ? $kdata['keywords'] : array();
-    $items    = array();
-    $seen_kws = array();
-    foreach ($keywords as $kw) {
-        for ($i = 0; $i < 30; $i++) {
-            $date      = date('Y-m-d', strtotime('-' . $i . ' days'));
-            $candidate = __DIR__ . '/data/' . $date . '_' . $kw . '.json';
-            if (!file_exists($candidate)) { continue; }
-            $raw  = file_get_contents($candidate);
-            $json = json_decode($raw, true);
-            if (!$json || !isset($json['analysis'])) { continue; }
-            if (isset($seen_kws[$kw])) { break; }
-            $seen_kws[$kw] = true;
-            $items[] = array(
-                'keyword'  => $kw,
-                'date'     => $date,
-                'analysis' => $json['analysis'],
-                'cms_url'  => 'https://aiknowledgecms.exbridge.jp/aithinkingmedia.php?kw=' . rawurlencode($kw) . '&base_date=' . $date,
-            );
-            break;
-        }
-    }
-    usort($items, function($a, $b) { return strcmp($b['date'], $a['date']); });
-    echo json_encode(array('ok' => true, 'items' => $items, 'keywords' => $keywords));
-    exit;
+date_default_timezone_set('Asia/Tokyo');
+
+$BASE_URL = 'https://aiknowledgecms.exbridge.jp';
+$DATA_DIR = __DIR__ . '/data';
+$THIS_FILE = 'aiknowledgesns.php';
+
+function h($s) {
+    return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 }
 
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// API: おすすめアカウント取得
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-if (isset($_GET['action']) && $_GET['action'] === 'recommended') {
-    header('Content-Type: application/json; charset=UTF-8');
-    $account = isset($_GET['account']) ? trim($_GET['account']) : '';
-    if (!$account) {
-        echo json_encode(array('ok' => false, 'reason' => 'no_account'));
-        exit;
+function read_json_file($path, $fallback) {
+    if (!file_exists($path)) { return $fallback; }
+    $json = json_decode(file_get_contents($path), true);
+    return is_array($json) ? $json : $fallback;
+}
+
+function short_text($text, $limit) {
+    $text = trim(preg_replace('/\s+/u', ' ', strip_tags((string)$text)));
+    if (function_exists('mb_substr') && mb_strlen($text, 'UTF-8') > $limit) {
+        return mb_substr($text, 0, $limit, 'UTF-8') . '...';
     }
-    $myfile = __DIR__ . '/data/keyword_' . preg_replace('/[^a-zA-Z0-9_]/', '', $account) . '.json';
-    if (!file_exists($myfile)) {
-        echo json_encode(array('ok' => true, 'accounts' => array()));
-        exit;
-    }
-    $mykdata = json_decode(file_get_contents($myfile), true);
-    $mykws   = isset($mykdata['keywords']) ? $mykdata['keywords'] : array();
-    $data_dir = __DIR__ . '/data/';
+    return strlen($text) > $limit ? substr($text, 0, $limit) . '...' : $text;
+}
+
+function safe_account($account) {
+    return preg_replace('/[^a-zA-Z0-9_]/', '', (string)$account);
+}
+
+function load_accounts($data_dir) {
     $accounts = array();
-    foreach (glob($data_dir . 'keyword_*.json') as $f) {
-        $kdata = json_decode(file_get_contents($f), true);
-        if (!$kdata || !isset($kdata['account'])) { continue; }
-        if ($kdata['account'] === $account) { continue; }
-        $common = array_values(array_intersect($mykws, $kdata['keywords']));
-        if (empty($common)) { continue; }
+    $files = glob($data_dir . '/keyword_*.json');
+    if (!$files) { return $accounts; }
+    foreach ($files as $file) {
+        $data = read_json_file($file, array());
+        if (empty($data['account'])) { continue; }
+        $account = safe_account($data['account']);
+        $user = isset($data['user']) && is_array($data['user']) ? $data['user'] : array();
+        $sources = isset($data['sources']) && is_array($data['sources']) ? $data['sources'] : array();
+        $keywords = isset($data['keywords']) && is_array($data['keywords']) ? $data['keywords'] : array();
+        $zenn = isset($sources['zenn']) && is_array($sources['zenn']) ? $sources['zenn'] : array();
         $accounts[] = array(
-            'account'         => $kdata['account'],
-            'user'            => isset($kdata['user']) ? $kdata['user'] : array(),
-            'keywords'        => $kdata['keywords'],
-            'common_keywords' => $common,
-            'common_count'    => count($common),
+            'account' => $account,
+            'name' => isset($user['name']) ? $user['name'] : '@' . $account,
+            'description' => isset($user['description']) ? $user['description'] : '',
+            'keywords' => $keywords,
+            'sources' => $sources,
+            'zenn_username' => isset($zenn['username']) ? $zenn['username'] : '',
+            'zenn_articles' => isset($zenn['articles_count']) ? (int)$zenn['articles_count'] : 0,
+            'zenn_likes' => isset($zenn['total_liked_count']) ? (int)$zenn['total_liked_count'] : 0,
+            'updated' => isset($data['updated']) ? $data['updated'] : '',
         );
     }
-    usort($accounts, function($a, $b) { return $b['common_count'] - $a['common_count']; });
-    echo json_encode(array('ok' => true, 'accounts' => $accounts));
-    exit;
+    usort($accounts, function($a, $b) {
+        $az = $a['zenn_articles'] + $a['zenn_likes'];
+        $bz = $b['zenn_articles'] + $b['zenn_likes'];
+        if ($az === $bz) { return strcmp($b['updated'], $a['updated']); }
+        return $bz - $az;
+    });
+    return $accounts;
 }
 
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// API: いいね送信
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-if (isset($_GET['action']) && $_GET['action'] === 'like') {
-    header('Content-Type: application/json; charset=UTF-8');
-    $body    = file_get_contents('php://input');
-    $req     = json_decode($body, true);
-    $from    = isset($req['from'])    ? trim($req['from'])    : '';
-    $to      = isset($req['to'])      ? trim($req['to'])      : '';
-    $keyword = isset($req['keyword']) ? trim($req['keyword']) : '';
-    if (!$from || !$to) {
-        echo json_encode(array('ok' => false, 'reason' => 'missing_params'));
-        exit;
+function load_oss_posts($data_dir, $limit) {
+    $posts = array();
+    $seen = array();
+    $bulk = read_json_file($data_dir . '/oss_posts.json', array());
+    if (is_array($bulk)) {
+        foreach ($bulk as $item) {
+            if (!is_array($item)) { continue; }
+            $id = isset($item['id']) ? $item['id'] : md5(json_encode($item));
+            if (isset($seen[$id])) { continue; }
+            $seen[$id] = true;
+            $posts[] = $item;
+        }
     }
-    $likes_file = __DIR__ . '/data/likes.json';
-    $likes = array();
-    if (file_exists($likes_file)) {
-        $raw     = file_get_contents($likes_file);
-        $decoded = json_decode($raw, true);
-        if (is_array($decoded)) { $likes = $decoded; }
+    $files = glob($data_dir . '/oss_*.json');
+    if ($files) {
+        foreach ($files as $file) {
+            $item = read_json_file($file, array());
+            if (empty($item['id'])) { continue; }
+            if (isset($seen[$item['id']])) { continue; }
+            $seen[$item['id']] = true;
+            $posts[] = $item;
+        }
     }
-    $already = false;
-    foreach ($likes as $like) {
-        if (isset($like['from']) && $like['from'] === $from && isset($like['to']) && $like['to'] === $to) {
-            $already = true;
+    usort($posts, function($a, $b) {
+        $ta = isset($a['timestamp']) ? (int)$a['timestamp'] : (isset($a['created_at']) ? strtotime($a['created_at']) : 0);
+        $tb = isset($b['timestamp']) ? (int)$b['timestamp'] : (isset($b['created_at']) ? strtotime($b['created_at']) : 0);
+        return $tb - $ta;
+    });
+    return array_slice($posts, 0, $limit);
+}
+
+function load_report_files($data_dir, $prefix, $key, $limit) {
+    $items = array();
+    $files = glob($data_dir . '/' . $prefix . '_*.json');
+    if (!$files) { return $items; }
+    rsort($files);
+    $seen = array();
+    foreach ($files as $file) {
+        $data = read_json_file($file, array());
+        if (empty($data[$key])) { continue; }
+        $slug = strtolower(preg_replace('/[^a-zA-Z0-9_\-]/', '_', $data[$key]));
+        if (isset($seen[$slug])) { continue; }
+        $seen[$slug] = true;
+        $items[] = $data;
+        if (count($items) >= $limit) { break; }
+    }
+    return $items;
+}
+
+function collect_tags($accounts, $oss_posts) {
+    $tags = array();
+    foreach ($accounts as $account) {
+        foreach ($account['keywords'] as $kw) {
+            $kw = trim((string)$kw);
+            if ($kw !== '') { $tags[$kw] = isset($tags[$kw]) ? $tags[$kw] + 1 : 1; }
+        }
+    }
+    foreach ($oss_posts as $post) {
+        if (empty($post['tags']) || !is_array($post['tags'])) { continue; }
+        foreach ($post['tags'] as $tag) {
+            $tag = trim((string)$tag);
+            if ($tag !== '') { $tags[$tag] = isset($tags[$tag]) ? $tags[$tag] + 1 : 1; }
+        }
+    }
+    arsort($tags);
+    return array_slice($tags, 0, 24, true);
+}
+
+$accounts = load_accounts($DATA_DIR);
+$oss_posts = load_oss_posts($DATA_DIR, 8);
+$finreports = load_report_files($DATA_DIR, 'finreport', 'ticker', 6);
+$polymarket_reports = load_report_files($DATA_DIR, 'polymarket', 'query', 6);
+$tags = collect_tags($accounts, $oss_posts);
+
+$view_account = isset($_GET['view'], $_GET['u']) && $_GET['view'] === 'account' ? safe_account($_GET['u']) : '';
+$profile = null;
+if ($view_account !== '') {
+    foreach ($accounts as $account) {
+        if (strtolower($account['account']) === strtolower($view_account)) {
+            $profile = $account;
             break;
         }
     }
-    if (!$already) {
-        $likes[] = array(
-            'from'      => $from,
-            'to'        => $to,
-            'keyword'   => $keyword,
-            'timestamp' => date('Y-m-d\TH:i:s'),
-        );
-        file_put_contents($likes_file, json_encode($likes, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-        echo json_encode(array('ok' => true, 'added' => true));
-    } else {
-        echo json_encode(array('ok' => true, 'added' => false, 'reason' => 'already_liked'));
-    }
-    exit;
 }
 
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// API: いいね解除
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-if (isset($_GET['action']) && $_GET['action'] === 'unlike') {
-    header('Content-Type: application/json; charset=UTF-8');
-    $body    = file_get_contents('php://input');
-    $req     = json_decode($body, true);
-    $from    = isset($req['from']) ? trim($req['from']) : '';
-    $to      = isset($req['to'])   ? trim($req['to'])   : '';
-    if (!$from || !$to) {
-        echo json_encode(array('ok' => false, 'reason' => 'missing_params'));
-        exit;
-    }
-    $likes_file = __DIR__ . '/data/likes.json';
-    $likes = array();
-    if (file_exists($likes_file)) {
-        $raw     = file_get_contents($likes_file);
-        $decoded = json_decode($raw, true);
-        if (is_array($decoded)) { $likes = $decoded; }
-    }
-    $new_likes = array();
-    $removed   = false;
-    foreach ($likes as $like) {
-        if (isset($like['from']) && $like['from'] === $from && isset($like['to']) && $like['to'] === $to) {
-            $removed = true;
-            continue;
-        }
-        $new_likes[] = $like;
-    }
-    file_put_contents($likes_file, json_encode($new_likes, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    echo json_encode(array('ok' => true, 'removed' => $removed));
-    exit;
-}
-
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// API: 自分が送ったいいね取得
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-if (isset($_GET['action']) && $_GET['action'] === 'sent_likes') {
-    header('Content-Type: application/json; charset=UTF-8');
-    $account = isset($_GET['account']) ? trim($_GET['account']) : '';
-    if (!$account) {
-        echo json_encode(array('ok' => false, 'reason' => 'no_account'));
-        exit;
-    }
-    $likes_file = __DIR__ . '/data/likes.json';
-    $sent = array();
-    if (file_exists($likes_file)) {
-        $raw   = file_get_contents($likes_file);
-        $likes = json_decode($raw, true);
-        if (is_array($likes)) {
-            foreach ($likes as $like) {
-                if (isset($like['from']) && $like['from'] === $account) {
-                    $sent[] = $like['to'];
-                }
-            }
-        }
-    }
-    echo json_encode(array('ok' => true, 'sent' => $sent));
-    exit;
-}
-
-if (isset($_GET['action']) && $_GET['action'] === 'my_likes') {
-    header('Content-Type: application/json; charset=UTF-8');
-    $account = isset($_GET['account']) ? trim($_GET['account']) : '';
-    if (!$account) {
-        echo json_encode(array('ok' => false, 'reason' => 'no_account'));
-        exit;
-    }
-    $likes_file = __DIR__ . '/data/likes.json';
-    $received   = array();
-    if (file_exists($likes_file)) {
-        $raw   = file_get_contents($likes_file);
-        $likes = json_decode($raw, true);
-        if (is_array($likes)) {
-            foreach ($likes as $like) {
-                if (isset($like['to']) && $like['to'] === $account) {
-                    $received[] = $like;
-                }
-            }
-        }
-    }
-    echo json_encode(array('ok' => true, 'received' => $received, 'count' => count($received)));
-    exit;
-}
-
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// API: ASINからタイトル取得
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-if (isset($_GET['action']) && $_GET['action'] === 'fetch_asin') {
-    header('Content-Type: application/json; charset=UTF-8');
-    $asin = isset($_GET['asin']) ? preg_replace('/[^A-Z0-9]/', '', strtoupper(trim($_GET['asin']))) : '';
-    if (!$asin || strlen($asin) !== 10) {
-        echo json_encode(array('ok' => false, 'reason' => 'invalid_asin'));
-        exit;
-    }
-    $url  = 'https://www.amazon.co.jp/dp/' . $asin;
-    $opts = array('http' => array(
-        'method'        => 'GET',
-        'header'        => implode("\r\n", array(
-            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept-Language: ja,en;q=0.9',
-            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        )),
-        'timeout'       => 12,
-        'ignore_errors' => true,
-    ));
-    $html = @file_get_contents($url, false, stream_context_create($opts));
-    $title = '';
-    if ($html) {
-        if (preg_match("/<span[^>]+id=[\"']productTitle[\"'][^>]*>\\s*(.*?)\\s*<\\/span>/s", $html, $m)) {
-            $title = html_entity_decode(strip_tags($m[1]), ENT_QUOTES, 'UTF-8');
-            $title = trim(preg_replace('/\s+/', ' ', $title));
-        }
-        if (!$title && preg_match('/<title>([^<]+)<\/title>/', $html, $m2)) {
-            $t = html_entity_decode($m2[1], ENT_QUOTES, 'UTF-8');
-            $t = preg_replace('/\s*[:\|].*Amazon.*$/u', '', $t);
-            $title = trim($t);
-        }
-    }
-    if ($title) {
-        echo json_encode(array('ok' => true, 'asin' => $asin, 'title' => $title, 'url' => $url), JSON_UNESCAPED_UNICODE);
-    } else {
-        echo json_encode(array('ok' => false, 'reason' => 'title_not_found', 'url' => $url));
-    }
-    exit;
-}
-
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// API: 管理者デフォルト商品リスト保存
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-if (isset($_GET['action']) && $_GET['action'] === 'save_admin_items') {
-    header('Content-Type: application/json; charset=UTF-8');
-    session_start();
-    $su = isset($_SESSION['session_username']) ? $_SESSION['session_username'] : '';
-    if ($su !== 'xb_bittensor') {
-        echo json_encode(array('ok' => false, 'reason' => 'unauthorized'));
-        exit;
-    }
-    $body     = file_get_contents('php://input');
-    $req      = json_decode($body, true);
-    $items    = isset($req['items'])        ? $req['items']        : array();
-    $admin_id = isset($req['associate_id']) ? trim($req['associate_id']) : '';
-    $clean = array();
-    foreach ($items as $item) {
-        $url   = isset($item['url'])   ? trim($item['url'])   : '';
-        $title = isset($item['title']) ? trim($item['title']) : '';
-        if ($url && $title) { $clean[] = array('url' => $url, 'title' => $title); }
-    }
-    $admin_file = __DIR__ . '/data/admin_associate.json';
-    file_put_contents($admin_file, json_encode(array(
-        'associate_id' => $admin_id,
-        'items'        => $clean,
-    ), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    echo json_encode(array('ok' => true, 'count' => count($clean)));
-    exit;
-}
-
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// API: アソシエイト情報保存
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-if (isset($_GET['action']) && $_GET['action'] === 'save_associate') {
-    header('Content-Type: application/json; charset=UTF-8');
-    $body    = file_get_contents('php://input');
-    $req     = json_decode($body, true);
-    $account = isset($req['account'])      ? trim($req['account'])      : '';
-    $assoc   = isset($req['associate_id']) ? trim($req['associate_id']) : '';
-    $items   = isset($req['items'])        ? $req['items']              : array();
-    if (!$account) {
-        echo json_encode(array('ok' => false, 'reason' => 'no_account'));
-        exit;
-    }
-    $file = __DIR__ . '/data/keyword_' . preg_replace('/[^a-zA-Z0-9_]/', '', $account) . '.json';
-    if (!file_exists($file)) {
-        echo json_encode(array('ok' => false, 'reason' => 'no_keyword_file'));
-        exit;
-    }
-    $data = json_decode(file_get_contents($file), true);
-    if (!is_array($data)) { $data = array(); }
-    $data['associate_id'] = $assoc;
-    $clean_items = array();
-    foreach ($items as $item) {
-        $url   = isset($item['url'])   ? trim($item['url'])   : '';
-        $title = isset($item['title']) ? trim($item['title']) : '';
-        if ($url && $title) {
-            $clean_items[] = array('url' => $url, 'title' => $title);
-        }
-    }
-    $data['associate_items'] = $clean_items;
-    file_put_contents($file, json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
-    echo json_encode(array('ok' => true));
-    exit;
-}
-
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// API: アソシエイト情報取得
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-if (isset($_GET['action']) && $_GET['action'] === 'get_associate') {
-    header('Content-Type: application/json; charset=UTF-8');
-    $account = isset($_GET['account']) ? trim($_GET['account']) : '';
-    if (!$account) {
-        echo json_encode(array('ok' => false, 'reason' => 'no_account'));
-        exit;
-    }
-    $file = __DIR__ . '/data/keyword_' . preg_replace('/[^a-zA-Z0-9_]/', '', $account) . '.json';
-    if (!file_exists($file)) {
-        echo json_encode(array('ok' => true, 'associate_id' => '', 'items' => array()));
-        exit;
-    }
-    $data = json_decode(file_get_contents($file), true);
-    $admin_file = __DIR__ . '/data/admin_associate.json';
-    $default_items = array();
-    if (file_exists($admin_file)) {
-        $admin_data = json_decode(file_get_contents($admin_file), true);
-        if (isset($admin_data['items'])) { $default_items = $admin_data['items']; }
-    }
-    $default_assoc_id = '';
-    if (file_exists($admin_file)) {
-        $ad = json_decode(file_get_contents($admin_file), true);
-        if (isset($ad['associate_id'])) { $default_assoc_id = $ad['associate_id']; }
-    }
-    echo json_encode(array(
-        'ok'                   => true,
-        'associate_id'         => isset($data['associate_id'])    ? $data['associate_id']    : '',
-        'items'                => isset($data['associate_items']) ? $data['associate_items'] : array(),
-        'default_items'        => $default_items,
-        'default_associate_id' => $default_assoc_id,
-        'keywords'             => isset($data['keywords'])        ? $data['keywords']        : array(),
-    ));
-    exit;
-}
-
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-// OAuth2 PKCE
-// qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-session_start();
-
-$keys_file = __DIR__ . '/x_api_keys.sh';
-$keys = array();
-if (file_exists($keys_file)) {
-    $lines = file($keys_file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        if (preg_match('/(?:export\s+)?(\w+)=["\']?([^"\'#\r\n]*)["\']?/', $line, $m)) {
-            $keys[trim($m[1])] = trim($m[2]);
-        }
-    }
-}
-$client_id     = isset($keys['X_API_KEY'])    ? $keys['X_API_KEY']    : '';
-$client_secret = isset($keys['X_API_SECRET']) ? $keys['X_API_SECRET'] : '';
-$redirect_uri  = 'https://aiknowledgecms.exbridge.jp/aiknowledgesns.php';
-
-function base64url($data) {
-    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
-}
-function gen_code_verifier() {
-    $bytes = '';
-    for ($i = 0; $i < 32; $i++) { $bytes .= chr(mt_rand(0, 255)); }
-    return base64url($bytes);
-}
-function gen_code_challenge($verifier) {
-    return base64url(hash('sha256', $verifier, true));
-}
-function x_api_post_sns($url, $post_data, $headers) {
-    $opts = array('http' => array(
-        'method'        => 'POST',
-        'header'        => implode("\r\n", $headers) . "\r\n",
-        'content'       => $post_data,
-        'timeout'       => 12,
-        'ignore_errors' => true,
-    ));
-    $res = @file_get_contents($url, false, stream_context_create($opts));
-    if (!$res) { $res = '{}'; }
-    return json_decode($res, true);
-}
-function x_api_get_sns($url, $params, $token) {
-    $full = count($params) ? $url . '?' . http_build_query($params) : $url;
-    $opts = array('http' => array(
-        'method'        => 'GET',
-        'header'        => "Authorization: Bearer $token\r\nUser-Agent: AIKnowledgeSNS/1.0\r\n",
-        'timeout'       => 12,
-        'ignore_errors' => true,
-    ));
-    $res = @file_get_contents($full, false, stream_context_create($opts));
-    if (!$res) { $res = '{}'; }
-    return json_decode($res, true);
-}
-
-if (isset($_GET['logout'])) {
-    session_destroy();
-    header('Location: ' . $redirect_uri);
-    exit;
-}
-
-if (isset($_GET['code']) && isset($_GET['state'])) {
-    $saved_state    = isset($_SESSION['oauth_state'])   ? $_SESSION['oauth_state']   : '';
-    $saved_verifier = isset($_SESSION['code_verifier']) ? $_SESSION['code_verifier'] : '';
-    if ($_GET['state'] !== $saved_state) {
-        die('State mismatch. <a href="' . $redirect_uri . '">戻る</a>');
-    }
-    $post = http_build_query(array(
-        'grant_type'    => 'authorization_code',
-        'code'          => $_GET['code'],
-        'redirect_uri'  => $redirect_uri,
-        'code_verifier' => $saved_verifier,
-        'client_id'     => $client_id,
-    ));
-    $cred = base64_encode($client_id . ':' . $client_secret);
-    $data = x_api_post_sns('https://api.twitter.com/2/oauth2/token', $post, array(
-        'Content-Type: application/x-www-form-urlencoded',
-        'Authorization: Basic ' . $cred,
-    ));
-    if (isset($data['access_token'])) {
-        $_SESSION['access_token'] = $data['access_token'];
-        unset($_SESSION['oauth_state'], $_SESSION['code_verifier']);
-        $me = x_api_get_sns('https://api.twitter.com/2/users/me', array(), $data['access_token']);
-        if (isset($me['data']['username'])) {
-            $_SESSION['session_username'] = $me['data']['username'];
-        }
-        header('Location: ' . $redirect_uri);
-    } else {
-        $err = isset($data['error_description']) ? $data['error_description'] : json_encode($data);
-        die('Token error: ' . htmlspecialchars($err) . ' <a href="' . $redirect_uri . '">戻る</a>');
-    }
-    exit;
-}
-
-if (isset($_GET['login'])) {
-    $verifier  = gen_code_verifier();
-    $challenge = gen_code_challenge($verifier);
-    $state     = md5(uniqid('', true));
-    $_SESSION['code_verifier'] = $verifier;
-    $_SESSION['oauth_state']   = $state;
-    $params = array(
-        'response_type'         => 'code',
-        'client_id'             => $client_id,
-        'redirect_uri'          => $redirect_uri,
-        'scope'                 => 'tweet.read users.read offline.access',
-        'state'                 => $state,
-        'code_challenge'        => $challenge,
-        'code_challenge_method' => 'S256',
-    );
-    header('Location: https://twitter.com/i/oauth2/authorize?' . http_build_query($params));
-    exit;
-}
-
-$logged_in    = isset($_SESSION['access_token']) && $_SESSION['access_token'] !== '';
-$session_user = isset($_SESSION['session_username']) ? $_SESSION['session_username'] : '';
-
-$has_keywords = false;
-$my_keywords  = array();
-if ($session_user) {
-    $kf = __DIR__ . '/data/keyword_' . preg_replace('/[^a-zA-Z0-9_]/', '', $session_user) . '.json';
-    $has_keywords = file_exists($kf);
-    if ($has_keywords) {
-        $mkdata      = json_decode(file_get_contents($kf), true);
-        $my_keywords = isset($mkdata['keywords']) ? $mkdata['keywords'] : array();
-    }
-}
-
-// アカウントページ表示
-$view_account  = '';
-$view_user     = array();
-$view_keywords = array();
-$view_sources  = array();
-if (isset($_GET['view']) && $_GET['view'] === 'account' && isset($_GET['u'])) {
-    $view_account = preg_replace('/[^a-zA-Z0-9_]/', '', trim($_GET['u']));
-    $vkf = __DIR__ . '/data/keyword_' . $view_account . '.json';
-    if (file_exists($vkf)) {
-        $vkdata        = json_decode(file_get_contents($vkf), true);
-        $view_user     = isset($vkdata['user'])     ? $vkdata['user']     : array();
-        $view_keywords = isset($vkdata['keywords']) ? $vkdata['keywords'] : array();
-        $view_sources  = isset($vkdata['sources'])  ? $vkdata['sources']  : array();
-    }
-}
+$page_title = $profile ? $profile['name'] . ' | AIKnowledgeSNS' : 'AIKnowledgeSNS | AI Knowledge Portal';
+$page_desc = $profile
+    ? short_text($profile['description'] . ' ' . implode(' ', $profile['keywords']), 150)
+    : 'AIKnowledgeSNSは、url2aiが自律的に集めたOSS、Zenn、FinReport、Polymarketなどの知識を人が読むための入口です。';
+$page_url = $profile
+    ? $BASE_URL . '/' . $THIS_FILE . '?view=account&u=' . rawurlencode($profile['account'])
+    : $BASE_URL . '/' . $THIS_FILE;
 ?><!DOCTYPE html>
 <html lang="ja">
 <head>
-<!-- Google tag (gtag.js) -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title><?php echo h($page_title); ?></title>
+<meta name="description" content="<?php echo h($page_desc); ?>">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="<?php echo h($page_url); ?>">
+<meta property="og:type" content="<?php echo $profile ? 'profile' : 'website'; ?>">
+<meta property="og:title" content="<?php echo h($page_title); ?>">
+<meta property="og:description" content="<?php echo h($page_desc); ?>">
+<meta property="og:url" content="<?php echo h($page_url); ?>">
+<meta property="og:site_name" content="AIKnowledgeSNS">
+<meta property="og:image" content="<?php echo h($BASE_URL); ?>/images/aiknowledgecms.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="<?php echo h($page_title); ?>">
+<meta name="twitter:description" content="<?php echo h($page_desc); ?>">
+<meta name="twitter:image" content="<?php echo h($BASE_URL); ?>/images/aiknowledgecms.png">
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-BP0650KDFR"></script>
 <script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-  gtag('config', 'G-BP0650KDFR');
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-BP0650KDFR');
 </script>
 <script>
 (function () {
-    var s = document.createElement('script');
-    s.src = 'https://aiknowledgecms.exbridge.jp/simpletrack.php'
-        + '?url=' + encodeURIComponent(location.href)
-        + '&ref=' + encodeURIComponent(document.referrer);
-    document.head.appendChild(s);
+  var s = document.createElement('script');
+  s.src = 'https://aiknowledgecms.exbridge.jp/simpletrack.php?url='
+    + encodeURIComponent(location.href) + '&ref=' + encodeURIComponent(document.referrer);
+  document.head.appendChild(s);
 })();
 </script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<?php
-$seo_title = 'AIKnowledgeSNS — AI×キーワードで繋がる次世代SNS | Amazonアソシエイト収益化';
-$seo_desc  = 'キーワードの近さでXアカウントを発見できるAI SNS。Amazonアソシエイト登録で広告収益も。シャドーバンチェックのAIRadarXと連携。';
-$seo_url   = 'https://aiknowledgecms.exbridge.jp/aiknowledgesns.php';
-if ($view_account) {
-    $vu = isset($view_user['name']) ? $view_user['name'] : '@' . $view_account;
-    $vk = !empty($view_keywords) ? implode(', ', array_slice($view_keywords, 0, 5)) : 'AI, テクノロジー';
-    $seo_title = $vu . ' (@' . $view_account . ') のキーワード知識 — AIKnowledgeSNS';
-    $seo_desc  = $vu . 'のキーワード: ' . $vk . '。AIKnowledgeSNSでキーワードが近いXアカウントを発見しましょう。';
-    $seo_url   = 'https://aiknowledgecms.exbridge.jp/aiknowledgesns.php?view=account&u=' . rawurlencode($view_account);
-}
-?>
-<title><?php echo htmlspecialchars($seo_title); ?></title>
-<meta name="description" content="<?php echo htmlspecialchars($seo_desc); ?>">
-<meta name="keywords" content="AI SNS,Xアカウント発見,キーワードSNS,Amazonアソシエイト,シャドーバン,AIKnowledgeSNS,<?php echo htmlspecialchars(implode(',', array_slice($view_keywords, 0, 5))); ?>">
-<link rel="canonical" href="<?php echo htmlspecialchars($seo_url); ?>">
-<meta property="og:type" content="<?php echo $view_account ? 'profile' : 'website'; ?>">
-<meta property="og:title" content="<?php echo htmlspecialchars($seo_title); ?>">
-<meta property="og:description" content="<?php echo htmlspecialchars($seo_desc); ?>">
-<meta property="og:url" content="<?php echo htmlspecialchars($seo_url); ?>">
-<meta property="og:site_name" content="AIKnowledgeSNS">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="<?php echo htmlspecialchars($seo_title); ?>">
-<meta name="twitter:description" content="<?php echo htmlspecialchars($seo_desc); ?>">
-<?php if ($view_account): ?>
-<meta name="twitter:site" content="@<?php echo htmlspecialchars($view_account); ?>">
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "ProfilePage",
-  "name": "<?php echo htmlspecialchars($vu); ?>",
-  "url": "<?php echo htmlspecialchars($seo_url); ?>",
-  "mainEntity": {
-    "@type": "Person",
-    "name": "<?php echo htmlspecialchars($vu); ?>",
-    "identifier": "<?php echo htmlspecialchars($view_account); ?>",
-    "sameAs": "https://x.com/<?php echo htmlspecialchars($view_account); ?>",
-    "knowsAbout": [<?php echo implode(',', array_map(function($k){ return '"' . addslashes($k) . '"'; }, $view_keywords)); ?>]
-  }
-}
-</script>
-<?php else: ?>
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  "name": "AIKnowledgeSNS",
-  "url": "https://aiknowledgecms.exbridge.jp/aiknowledgesns.php",
-  "description": "キーワードの近さでXアカウントを発見できるAI SNS。Amazonアソシエイト登録で広告収益も。",
-  "applicationCategory": "SocialNetworkingApplication",
-  "operatingSystem": "Web",
-  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "JPY"},
-  "keywords": "AI SNS,Xアカウント発見,キーワードSNS,Amazonアソシエイト,AIKnowledgeSNS"
-}
-</script>
-<?php endif; ?>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="aiknowledgesns.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+:root{--bg:#f8fafc;--panel:#fff;--text:#111827;--muted:#64748b;--line:#e2e8f0;--blue:#2563eb;--indigo:#4f46e5;--soft:#eef2ff;--mono:'JetBrains Mono',monospace}
+body{margin:0;background:linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;min-height:100vh}
+a{color:inherit;text-decoration:none}
+.header{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.bar{max-width:1180px;margin:0 auto;padding:15px 22px;display:flex;align-items:center;gap:18px}
+.logo{font-weight:800;font-size:18px;letter-spacing:-.03em}.logo span{color:var(--blue)}
+.nav{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.nav a{font-size:12px;font-weight:700;color:#475569;border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:#fff}.nav a:hover{border-color:#bfdbfe;color:var(--blue);background:#eff6ff}
+.container{max-width:1180px;margin:0 auto;padding:34px 22px 70px}
+.hero{text-align:center;padding:34px 20px 28px}.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#3730a3;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:8px 14px;margin-bottom:18px}
+.hero h1{font-size:42px;line-height:1.18;letter-spacing:-.04em;margin:0 0 16px}.hero p{max-width:820px;margin:0 auto;color:#475569;font-size:17px;line-height:1.85}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:28px}.stat{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:16px;padding:18px 20px;text-align:left;box-shadow:0 12px 32px rgba(15,23,42,.05)}.stat strong{display:block;font-size:29px;line-height:1;color:#0f172a;margin-bottom:8px}.stat span{font-size:12px;color:var(--muted);font-weight:700}
+.section{margin-top:34px}.section-head{display:flex;align-items:end;justify-content:space-between;gap:16px;margin-bottom:14px}.section h2{margin:0;font-size:23px;letter-spacing:-.03em}.section p.lead{margin:4px 0 0;color:var(--muted);line-height:1.7}
+.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.flow-step{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 12px 30px rgba(15,23,42,.05)}.flow-step b{display:block;font-size:14px;margin-bottom:8px}.flow-step span{color:var(--muted);font-size:12px;line-height:1.65}
+.product-grid,.account-grid,.stream-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 14px 30px rgba(148,163,184,.08);transition:transform .16s ease,box-shadow .16s ease}.card:hover{transform:translateY(-2px);box-shadow:0 18px 42px rgba(37,99,235,.12)}
+.visual{height:112px;background:radial-gradient(circle at top right,rgba(255,255,255,.24),transparent 36%),linear-gradient(135deg,var(--accent,#2563eb),#0f172a);position:relative}.badge{position:absolute;left:14px;top:14px;background:rgba(255,255,255,.9);border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;color:#111827;box-shadow:0 10px 24px rgba(15,23,42,.14)}
+.body{padding:18px}.pill{display:inline-flex;font-family:var(--mono);font-size:10px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:999px;padding:4px 9px;margin-bottom:10px}.body h3{margin:0 0 8px;font-size:18px;letter-spacing:-.02em}.body p{margin:0;color:#64748b;line-height:1.7;font-size:13px}.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.meta span,.tag{font-size:11px;font-weight:700;color:#475569;background:#f8fafc;border:1px solid var(--line);border-radius:999px;padding:5px 8px}
+.item{display:block;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 10px 24px rgba(15,23,42,.04)}.item:hover{border-color:#bfdbfe}.item-title{font-weight:800;font-size:15px;line-height:1.45;margin-bottom:7px}.item-text{color:#64748b;font-size:13px;line-height:1.65}.item-foot{display:flex;flex-wrap:wrap;gap:8px;margin-top:11px;color:#64748b;font-size:11px;font-family:var(--mono)}
+.account-card{display:block;background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 12px 28px rgba(15,23,42,.05)}.account-card:hover{border-color:#bfdbfe}.handle{font-family:var(--mono);font-weight:700;color:#2563eb;font-size:13px}.name{font-size:17px;font-weight:800;margin:7px 0}.desc{color:#64748b;line-height:1.65;font-size:13px;min-height:42px}.tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
+.portal-box{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:18px;padding:22px 24px;box-shadow:0 16px 40px rgba(15,23,42,.05);line-height:1.85;color:#374151}
+.profile{background:#fff;border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:0 16px 40px rgba(15,23,42,.06);margin-top:24px}.profile-top{display:flex;justify-content:space-between;gap:16px;align-items:start}.profile h1{font-size:28px;margin:6px 0 10px}.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px}.btn{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid #bfdbfe;color:#1d4ed8;background:#eff6ff;font-weight:800;font-size:13px;padding:9px 12px}
+.empty{background:#fff;border:1px dashed #cbd5e1;border-radius:16px;padding:22px;color:#64748b;line-height:1.7}.search{width:100%;max-width:360px;border:1px solid var(--line);border-radius:999px;padding:11px 15px;font:inherit;outline:none}.search:focus{border-color:#93c5fd;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+@media(max-width:820px){.bar{align-items:flex-start;flex-direction:column}.nav{margin-left:0}.hero h1{font-size:31px}.stats,.flow{grid-template-columns:1fr}.profile-top{display:block}.container{padding:24px 16px 50px}}
+</style>
 </head>
 <body>
-<div class="app">
-  <div class="header">
-    <a href="aiknowledgesns.php" class="logo" style="text-decoration:none;">AIKnowledgeSNS</a>
-    <div class="tagline">◈ CONNECT · KNOWLEDGE · DISCOVER ◈</div>
-    <div class="loginbar">
-      <?php if ($logged_in): ?>
-        <a href="?view=account&u=<?php echo rawurlencode($session_user); ?>" class="mypage-link">● @<?php echo htmlspecialchars($session_user); ?></a>
-        <a href="?logout=1">logout</a>
-      <?php else: ?>
-        <a href="?login=1">X でログイン</a>
+<header class="header">
+  <div class="bar">
+    <a class="logo" href="aiknowledgesns.php">AIKnowledge<span>SNS</span></a>
+    <nav class="nav">
+      <a href="aiknowledgecms.php">CMS</a>
+      <a href="oss.php">OSS</a>
+      <a href="osszenn.php">OSS Zenn</a>
+      <a href="finreport.php">FinReport</a>
+      <a href="polymarket.php">Polymarket</a>
+      <a href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="container">
+<?php if ($profile): ?>
+  <div class="eyebrow">Knowledge Profile</div>
+  <section class="profile">
+    <div class="profile-top">
+      <div>
+        <div class="handle">@<?php echo h($profile['account']); ?></div>
+        <h1><?php echo h($profile['name']); ?></h1>
+        <?php if ($profile['description']): ?><p class="desc"><?php echo h($profile['description']); ?></p><?php endif; ?>
+      </div>
+      <a class="btn" href="aiknowledgesns.php">Portal</a>
+    </div>
+    <div class="tags">
+      <?php foreach (array_slice($profile['keywords'], 0, 16) as $kw): ?>
+      <span class="tag">#<?php echo h($kw); ?></span>
+      <?php endforeach; ?>
+    </div>
+    <div class="actions">
+      <a class="btn" href="https://x.com/<?php echo h($profile['account']); ?>" target="_blank" rel="noopener">X profile</a>
+      <?php if ($profile['zenn_username']): ?>
+      <a class="btn" href="https://zenn.dev/<?php echo h($profile['zenn_username']); ?>" target="_blank" rel="noopener">Zenn</a>
       <?php endif; ?>
     </div>
-  </div>
+  </section>
+<?php else: ?>
+  <section class="hero">
+    <div class="eyebrow">AI Knowledge Portal</div>
+    <h1>AIが集めた知識を、人が読む入口へ。</h1>
+    <p>AIKnowledgeSNSは、発信するSNSではなく、url2aiが自律的に蓄積したOSS、Zenn、FinReport、Polymarketなどの知識を横断して読むためのポータルです。</p>
+    <div class="stats">
+      <div class="stat"><strong><?php echo number_format(count($accounts)); ?></strong><span>Knowledge Accounts</span></div>
+      <div class="stat"><strong><?php echo number_format(count($oss_posts)); ?></strong><span>Recent OSS Items</span></div>
+      <div class="stat"><strong><?php echo number_format(count($finreports)); ?></strong><span>FinReports</span></div>
+      <div class="stat"><strong><?php echo number_format(count($polymarket_reports)); ?></strong><span>Polymarket Reports</span></div>
+    </div>
+  </section>
 
-  <?php if (!$logged_in && !$view_account): ?>
-  <!-- ======== 未ログイン・非アカウントページ：ログインゲート ======== -->
-  <div class="gate">
-    <div class="gate-inner">
-      <div class="gate-logo">◎</div>
-      <div class="gate-msg">
-        <div>知識でXのフォローすべき人を発見する</div>
-        <div>Xアカウントでログインしてください</div>
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2>Product Structure</h2>
+        <p class="lead">裏側で集め、表側で読ませる。AIKnowledgeCMSの役割をこの形に整理します。</p>
       </div>
-      <a href="?login=1" class="xbtn">X でログイン</a>
-      <div class="gate-assoc">
-        <div class="gate-assoc-title">◯ AMAZON アソシエイトで収益を得る</div>
-        <div class="gate-assoc-body">
-          ログイン後、マイページで<strong>Amazonアソシエイト ID</strong>を登録すると、
-          あなたのページに広告が表示され、閲覧者が購入した場合に<strong>収益を得る</strong>ことができます。<br><br>
-          キーワードに基づいた関連商品が自動表示されます。
-        </div>
+    </div>
+    <div class="flow">
+      <div class="flow-step"><b>url2ai</b><span>URL、OSS、Zenn、金融、予測市場などを自律収集するエンジン。</span></div>
+      <div class="flow-step"><b>Knowledge JSON</b><span>集めた情報を日付・テーマ・対象ごとに構造化して蓄積。</span></div>
+      <div class="flow-step"><b>AIKnowledgeCMS</b><span>蓄積された知識を長期的に管理する中核。</span></div>
+      <div class="flow-step"><b>AIKnowledgeSNS</b><span>人が読む入口。ポータル、タイムライン、カテゴリ横断。</span></div>
+      <div class="flow-step"><b>Reuse</b><span>記事、資料、分析、次のAI処理へ知識を再利用。</span></div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2>Knowledge Products</h2>
+        <p class="lead">自律的に知識が増えていく領域を、AIKnowledgeCMSのプロダクトとして見せます。</p>
       </div>
-      <div id="aigm-ad-gate" style="margin-top:16px;"></div>
     </div>
-  </div>
-<script>
-function aigmAdGateLogin(data) {
-  if (!data || !data.ok || !data.html) { return; }
-  var c = document.getElementById('aigm-ad-gate');
-  if (c) { c.innerHTML = data.html; }
-}
-(function() {
-  var s = document.createElement('script');
-  s.src = 'https://aiknowledgecms.exbridge.jp/adwidget.php?callback=aigmAdGateLogin&slot=gate&limit=3';
-  (document.body || document.head).appendChild(s);
-})();
-</script>
-  <!-- ======== ゲート画面：アカウントリスト ======== -->
-  <div class="gate-account-list">
-    <div class="gate-account-list-title">◈ REGISTERED ACCOUNTS</div>
-    <div class="gate-account-grid" id="gate-account-grid">
-      <div style="font-family:'Share Tech Mono',monospace;font-size:.72rem;color:var(--muted);padding:20px;">◎ loading...</div>
+    <div class="product-grid">
+      <a class="card" href="oss.php"><div class="visual" style="--accent:#0d9488"><span class="badge">OSS</span></div><div class="body"><span class="pill">AUTONOMOUS</span><h3>OSS Knowledge</h3><p>AI系OSSを収集し、背景、用途、使いどころを知識化します。</p></div></a>
+      <a class="card" href="osszenn.php"><div class="visual" style="--accent:#3b82f6"><span class="badge">OSS + Zenn</span></div><div class="body"><span class="pill">MATCHING</span><h3>Zenn Knowledge</h3><p>Zennの技術者・記事とOSSをつなぎ、学習導線にします。</p></div></a>
+      <a class="card" href="finreport.php"><div class="visual" style="--accent:#0369a1"><span class="badge">FinReport</span></div><div class="body"><span class="pill">MARKET INTEL</span><h3>Financial Reports</h3><p>株式、暗号資産、企業情報をAIが投資レポート化します。</p></div></a>
+      <a class="card" href="polymarket.php"><div class="visual" style="--accent:#7c3aed"><span class="badge">Polymarket</span></div><div class="body"><span class="pill">PREDICTION</span><h3>Prediction Intelligence</h3><p>予測市場のテーマを読み解き、確率と文脈を知識化します。</p></div></a>
     </div>
-  </div>
-<script>
-(function() {
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', 'accounts.php?action=list', true);
-  xhr.onreadystatechange = function() {
-    if (xhr.readyState !== 4) { return; }
-    var grid = document.getElementById('gate-account-grid');
-    if (!grid) { return; }
-    try {
-      var data = JSON.parse(xhr.responseText);
-      var accounts = (data && data.accounts) ? data.accounts : [];
-      if (accounts.length === 0) {
-        grid.innerHTML = '<div style="font-family:\'Share Tech Mono\',monospace;font-size:.72rem;color:var(--vm);padding:20px;">アカウントがありません</div>';
-        return;
-      }
-      var html = '';
-      for (var i = 0; i < accounts.length; i++) {
-        var a    = accounts[i];
-        var user = a.user || {};
-        var name = user.name || ('@' + a.account);
-        var bio  = user.description || '';
-        var kws  = a.keywords || [];
-        var kwHtml = '';
-        for (var j = 0; j < kws.length && j < 4; j++) {
-          kwHtml += '<span class="gate-acard-kw">#' + escHtml(kws[j]) + '</span>';
-        }
-        html +=
-          '<a href="aiknowledgesns.php?view=account&u=' + encodeURIComponent(a.account) + '" class="gate-acard">' +
-            '<div class="gate-acard-handle">@' + escHtml(a.account) + '</div>' +
-            (name !== '@' + a.account ? '<div class="gate-acard-name">' + escHtml(name) + '</div>' : '') +
-            (bio ? '<div class="gate-acard-bio">' + escHtml(bio) + '</div>' : '') +
-            '<div class="gate-acard-kws">' + kwHtml + '</div>' +
-          '</a>';
-      }
-      grid.innerHTML = html;
-    } catch(e) {
-      grid.innerHTML = '<div style="font-family:\'Share Tech Mono\',monospace;font-size:.72rem;color:var(--vm);padding:20px;">取得失敗</div>';
-    }
-  };
-  xhr.send();
-})();
-</script>
+  </section>
 
-  <?php elseif ($logged_in && !$has_keywords && !$view_account): ?>
-  <!-- ======== ログイン済みだがキーワードなし ======== -->
-  <div class="gate">
-    <div class="gate-inner">
-      <div class="gate-logo">◎</div>
-      <div class="gate-msg">
-        <div>@<?php echo htmlspecialchars($session_user); ?> のキーワードデータがありません</div>
-        <div>先にAIRadarXでスキャンしてください</div>
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2>Knowledge Radar</h2>
+        <p class="lead">最新の蓄積を横断して読む入口です。</p>
       </div>
-      <a href="airadarx.php" class="xbtn">AIRadarX へ</a>
     </div>
-  </div>
-
-  <?php elseif ($view_account): ?>
-  <!-- ======== アカウントページ（ログイン有無問わず表示） ======== -->
-  <div class="profile-card">
-    <div class="profile-handle">@<?php echo htmlspecialchars($view_account); ?>
-      <?php if (!empty($view_user['name'])): ?>
-      <span class="profile-name"><?php echo htmlspecialchars($view_user['name']); ?></span>
-      <?php endif; ?>
-    </div>
-    <?php if (!empty($view_user['public_metrics'])): $m = $view_user['public_metrics']; ?>
-    <div class="profile-metrics">
-      フォロワー <span><?php echo number_format($m['followers_count']); ?></span>
-      &nbsp; フォロー <span><?php echo number_format($m['following_count']); ?></span>
-    </div>
-    <?php endif; ?>
-    <?php if (!empty($view_user['description'])): ?>
-    <div class="profile-bio"><?php echo htmlspecialchars($view_user['description']); ?></div>
-    <?php endif; ?>
-
-    <?php
-    // qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-    // Zenn情報バッジ（追加）
-    // qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-    $vs   = (is_array($view_sources) && !isset($view_sources[0])) ? $view_sources : array();
-    $zenn = isset($vs['zenn']) ? $vs['zenn'] : null;
-    if ($zenn):
-    ?>
-    <div style="margin:8px 0 12px;font-family:'Share Tech Mono',monospace;font-size:.68rem;padding:8px 14px;background:rgba(170,136,255,.08);border:1px solid rgba(170,136,255,.3);border-radius:4px;color:#aa88ff;line-height:2;">
-      Zenn:
-      <a href="https://zenn.dev/<?php echo htmlspecialchars($zenn['username']); ?>" target="_blank" style="color:#aa88ff;">
-        <?php echo htmlspecialchars($zenn['username']); ?>
+    <div class="stream-grid">
+      <?php foreach ($oss_posts as $post): ?>
+      <a class="item" href="oss.php?id=<?php echo urlencode(isset($post['id']) ? $post['id'] : ''); ?>">
+        <div class="item-title"><?php echo h(isset($post['title']) ? $post['title'] : 'OSS Knowledge'); ?></div>
+        <div class="item-text"><?php echo h(short_text(isset($post['post_text']) ? $post['post_text'] : (isset($post['summary']) ? $post['summary'] : ''), 130)); ?></div>
+        <div class="item-foot"><span>OSS</span><?php if (!empty($post['created_at'])): ?><span><?php echo h(substr($post['created_at'], 0, 10)); ?></span><?php endif; ?></div>
       </a>
-      &nbsp;|&nbsp; 記事 <strong><?php echo intval($zenn['articles_count']); ?></strong>
-      &nbsp;|&nbsp; いいね <strong><?php echo intval($zenn['total_liked_count']); ?></strong>
-      &nbsp;|&nbsp; フォロワー <strong><?php echo intval($zenn['follower_count']); ?></strong>
-      <?php if (!empty($zenn['github_username'])): ?>
-      &nbsp;|&nbsp; <a href="https://github.com/<?php echo htmlspecialchars($zenn['github_username']); ?>" target="_blank" style="color:#aa88ff;">GitHub: <?php echo htmlspecialchars($zenn['github_username']); ?> →</a>
-      <?php endif; ?>
-      <?php if (!empty($zenn['tags'])): ?>
-      <br>タグ:
-      <?php foreach ($zenn['tags'] as $tag): ?>
-        <span style="background:rgba(170,136,255,.15);border:1px solid rgba(170,136,255,.25);border-radius:20px;padding:1px 8px;margin-right:4px;">#<?php echo htmlspecialchars($tag); ?></span>
       <?php endforeach; ?>
-      <?php endif; ?>
-    </div>
-    <?php endif; ?>
-
-    <?php
-    // qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-    // Zenn RSS 最新記事取得・表示
-    // qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq
-    if ($zenn && isset($zenn['username']) && $zenn['username']):
-        $rss_url  = 'https://zenn.dev/' . rawurlencode($zenn['username']) . '/feed';
-        $rss_opts = array('http' => array(
-            'method'        => 'GET',
-            'header'        => "User-Agent: Mozilla/5.0 (compatible; AIKnowledgeBot/1.0)\r\nAccept: application/rss+xml,application/xml,text/xml\r\n",
-            'timeout'       => 8,
-            'ignore_errors' => true,
-        ));
-        $rss_raw  = @file_get_contents($rss_url, false, stream_context_create($rss_opts));
-        $zenn_articles = array();
-        if ($rss_raw) {
-            libxml_use_internal_errors(true);
-            $xml = simplexml_load_string($rss_raw);
-            if ($xml && isset($xml->channel->item)) {
-                $count = 0;
-                foreach ($xml->channel->item as $item) {
-                    if ($count >= 5) { break; }
-                    $pub = isset($item->pubDate) ? date('Y-m-d', strtotime((string)$item->pubDate)) : '';
-                    // liked_count は description 内にあることがある（なければ0）
-                    $liked = 0;
-                    if (isset($item->children('http://zenn.dev/ns#')->liked_count)) {
-                        $liked = intval($item->children('http://zenn.dev/ns#')->liked_count);
-                    }
-                    $zenn_articles[] = array(
-                        'title'   => (string)$item->title,
-                        'link'    => (string)$item->link,
-                        'pubDate' => $pub,
-                        'liked'   => $liked,
-                    );
-                    $count++;
-                }
-            }
-        }
-    ?>
-    <?php if (!empty($zenn_articles)): ?>
-    <div class="zenn-articles">
-      <div class="zenn-articles-title">
-        ◯ ZENN 最新記事
-        <a href="<?php echo htmlspecialchars($rss_url); ?>" target="_blank" class="zenn-rss-link">RSS ↗</a>
-      </div>
-      <?php foreach ($zenn_articles as $art): ?>
-      <div class="zenn-article-item">
-        <a href="<?php echo htmlspecialchars($art['link']); ?>" target="_blank" class="zenn-article-title">
-          <?php echo htmlspecialchars($art['title']); ?>
-        </a>
-        <div class="zenn-article-meta">
-          <?php if ($art['pubDate']): ?>
-          <span class="zenn-article-date"><?php echo htmlspecialchars($art['pubDate']); ?></span>
-          <?php endif; ?>
-          <?php if ($art['liked'] > 0): ?>
-          <span class="zenn-article-liked">♥ <?php echo intval($art['liked']); ?></span>
-          <?php endif; ?>
-        </div>
-      </div>
+      <?php foreach ($finreports as $report): ?>
+      <a class="item" href="finreport.php?ticker=<?php echo urlencode($report['ticker']); ?>">
+        <div class="item-title"><?php echo h($report['ticker']); ?> 投資レポート</div>
+        <div class="item-text"><?php echo h(short_text(isset($report['summary']) ? $report['summary'] : '', 130)); ?></div>
+        <div class="item-foot"><span>FinReport</span><?php if (!empty($report['created_at'])): ?><span><?php echo h(substr($report['created_at'], 0, 10)); ?></span><?php endif; ?></div>
+      </a>
       <?php endforeach; ?>
-    </div>
-    <?php endif; ?>
-    <?php endif; ?>
-
-    <div class="profile-actions">
-      <a href="aiknowledgesns.php" class="back-link">← 戻る</a>
-      <a href="https://x.com/<?php echo htmlspecialchars($view_account); ?>" target="_blank" class="profile-xlink">X で見る →</a>
-      <?php if (!empty($zenn)): ?>
-      <a href="https://zenn.dev/<?php echo htmlspecialchars($zenn['username']); ?>" target="_blank" class="profile-xlink" style="color:#aa88ff;border-color:rgba(170,136,255,.35);">Zenn →</a>
-      <?php endif; ?>
-      <?php if ($view_account !== $session_user): ?>
-      <button class="like-btn" id="likebtn-profile" onclick="sendLikeProfile('<?php echo addslashes(htmlspecialchars($view_account)); ?>')">
-        <span class="heart">♡</span><span>いいね</span>
-      </button>
-      <span id="followwrap-profile" style="display:none;">
-        <a href="https://x.com/intent/follow?screen_name=<?php echo htmlspecialchars($view_account); ?>" target="_blank" class="profile-xlink">X フォロー →</a>
-      </span>
+      <?php foreach ($polymarket_reports as $report): ?>
+      <a class="item" href="polymarket.php?query=<?php echo urlencode($report['query']); ?>">
+        <div class="item-title"><?php echo h($report['query']); ?></div>
+        <div class="item-text"><?php echo h(short_text(isset($report['summary']) ? $report['summary'] : '', 130)); ?></div>
+        <div class="item-foot"><span>Polymarket</span><?php if (!empty($report['created_at'])): ?><span><?php echo h(substr($report['created_at'], 0, 10)); ?></span><?php endif; ?></div>
+      </a>
+      <?php endforeach; ?>
+      <?php if (empty($oss_posts) && empty($finreports) && empty($polymarket_reports)): ?>
+      <div class="empty">まだローカルの知識データがありません。本番環境の <code>data/</code> に蓄積されたJSONを読む想定です。</div>
       <?php endif; ?>
     </div>
-  </div>
+  </section>
 
-  <div class="grid">
-    <div>
-      <div class="panel">
-        <div class="pt">◯ <?php echo ($view_account === $session_user) ? 'RECOMMENDED ACCOUNTS' : 'RECOMMENDED FOR @' . htmlspecialchars($view_account); ?></div>
-        <div id="view-recommended"><div class="loading">◎ loading...</div></div>
+  <section class="section">
+    <div class="section-head">
+      <div>
+        <h2>Knowledge Accounts</h2>
+        <p class="lead">ZennやX由来の知識アカウントを、読む対象として一覧化します。</p>
       </div>
+      <input class="search" id="account-search" type="search" placeholder="アカウント・キーワード検索">
     </div>
-    <div>
-      <?php if ($view_account === 'xb_bittensor'): ?>
-      <div class="panel" style="margin-bottom:12px;">
-        <div class="pt">◯ OSS TIMELINE</div>
-        <?php
-        $oss_file  = __DIR__ . '/data/oss_posts.json';
-        $oss_posts = array();
-        if (file_exists($oss_file)) {
-            $oss_posts = json_decode(file_get_contents($oss_file), true);
-            if (!$oss_posts) $oss_posts = array();
-        }
-        $oss_recent = array_slice($oss_posts, 0, 5);
-        if (empty($oss_recent)):
-        ?>
-        <div style="padding:12px;font-size:13px;color:#888;">投稿がありません</div>
-        <?php else: ?>
-        <ul style="list-style:none;padding:0;margin:0;">
-        <?php foreach ($oss_recent as $op): ?>
-          <li style="border-bottom:1px solid #1e2330;padding:10px 14px;">
-            <a href="https://aiknowledgecms.exbridge.jp/oss.php?id=<?php echo urlencode($op['id']); ?>"
-               style="color:#8b9cf4;text-decoration:none;font-size:13px;font-weight:600;display:block;margin-bottom:3px;"
-               target="_blank">
-              <?php echo htmlspecialchars(mb_substr($op['title'], 0, 50)); ?>
-            </a>
-            <span style="font-size:11px;color:#555;"><?php echo htmlspecialchars(substr($op['created_at'], 0, 10)); ?></span>
-          </li>
-        <?php endforeach; ?>
-        </ul>
-        <div style="padding:8px 14px;">
-          <a href="https://aiknowledgecms.exbridge.jp/oss.php" target="_blank"
-             style="font-size:12px;color:#6c63ff;text-decoration:none;">→ すべて見る</a>
+    <div class="account-grid" id="account-grid">
+      <?php foreach ($accounts as $account): ?>
+      <a class="account-card" href="aiknowledgesns.php?view=account&u=<?php echo urlencode($account['account']); ?>" data-search="<?php echo h(strtolower($account['account'] . ' ' . $account['name'] . ' ' . $account['description'] . ' ' . implode(' ', $account['keywords']) . ' ' . $account['zenn_username'])); ?>">
+        <div class="handle">@<?php echo h($account['account']); ?></div>
+        <div class="name"><?php echo h($account['name']); ?></div>
+        <div class="desc"><?php echo h(short_text($account['description'], 90)); ?></div>
+        <div class="tags">
+          <?php foreach (array_slice($account['keywords'], 0, 5) as $kw): ?><span class="tag">#<?php echo h($kw); ?></span><?php endforeach; ?>
         </div>
-        <?php endif; ?>
-      </div>
-      <?php endif; ?>
-      <div class="panel">
-        <div class="pt">◯ KNOWLEDGE TIMELINE</div>
-        <div class="kwlist" id="view-kwlist"></div>
-        <div id="view-timeline"><div class="loading">◎ loading...</div></div>
+      </a>
+      <?php endforeach; ?>
+      <?php if (empty($accounts)): ?><div class="empty">アカウントデータがありません。</div><?php endif; ?>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><div><h2>Knowledge Tags</h2><p class="lead">蓄積された知識の入り口になるキーワードです。</p></div></div>
+    <div class="portal-box">
+      <div class="tags">
+      <?php foreach ($tags as $tag => $count): ?>
+        <span class="tag">#<?php echo h($tag); ?> <?php echo (int)$count; ?></span>
+      <?php endforeach; ?>
+      <?php if (empty($tags)): ?>タグデータがありません。<?php endif; ?>
       </div>
     </div>
-  </div>
+  </section>
+<?php endif; ?>
+</main>
 
 <script>
-var MY_ACCOUNT   = '<?php echo addslashes($session_user); ?>';
-var VIEW_ACCOUNT = '<?php echo addslashes($view_account); ?>';
-var VIEW_KEYWORDS = <?php echo json_encode(array_values($view_keywords), JSON_UNESCAPED_UNICODE); ?>;
-var likedAccounts = {};
-var expandStates  = {};
-var CMS_BASE = 'https://aiknowledgecms.exbridge.jp/aithinkingmedia.php';
-
-function g(id) { return document.getElementById(id); }
-function xhrGet(url, cb) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
-  xhr.onreadystatechange = function () {
-    if (xhr.readyState !== 4) { return; }
-    try { cb(null, JSON.parse(xhr.responseText)); } catch (e) { cb(e, null); }
-  };
-  xhr.send();
-}
-function xhrPost(url, payload, cb) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', url, true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.onreadystatechange = function () {
-    if (xhr.readyState !== 4) { return; }
-    try { cb(null, JSON.parse(xhr.responseText)); } catch (e) { cb(e, null); }
-  };
-  xhr.send(JSON.stringify(payload));
-}
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function cmsUrl(kw, date) {
-  var url = CMS_BASE + '?kw=' + encodeURIComponent(kw);
-  if (date) { url += '&base_date=' + encodeURIComponent(date); }
-  return url;
-}
-function toggleExpand(id) {
-  var body = document.getElementById('tlbody-' + id);
-  var btn  = document.getElementById('tlbtn-' + id);
-  if (!body) { return; }
-  if (expandStates[id]) {
-    body.className = 'tl-body';
-    btn.textContent = '▼ 続きを読む';
-    expandStates[id] = false;
-  } else {
-    body.className = 'tl-body expanded';
-    btn.textContent = '▲ 閉じる';
-    expandStates[id] = true;
-  }
-}
-function scrollToKw(kw) {
-  var safeKw = kw.replace(/[^a-zA-Z0-9]/g, '_');
-  var el = document.getElementById('tl-' + safeKw);
-  if (!el) { return; }
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  el.className = el.className + ' scrolled';
-  setTimeout(function() { el.className = el.className.replace(' scrolled', ''); }, 900);
-}
-// いいね／いいね解除トグル（プロフィールボタン）
-function sendLikeProfile(toAccount) {
-  if (!MY_ACCOUNT) { return; }
-  var btn = g('likebtn-profile');
-  var fw  = g('followwrap-profile');
-  if (likedAccounts[toAccount]) {
-    // いいね解除
-    xhrPost('?action=unlike', { from: MY_ACCOUNT, to: toAccount }, function(err, data) {
-      console.log('[DEBUG] unlike profile: removed=' + (data ? data.removed : 'err'));
-    });
-    likedAccounts[toAccount] = false;
-    btn.classList.remove('liked');
-    btn.innerHTML = '<span class="heart">♡</span><span>いいね</span>';
-    if (fw) { fw.style.display = 'none'; }
-  } else {
-    // いいね
-    xhrPost('?action=like', { from: MY_ACCOUNT, to: toAccount, keyword: '' }, function(err, data) {
-      console.log('[DEBUG] like profile: added=' + (data ? data.added : 'err'));
-    });
-    likedAccounts[toAccount] = true;
-    btn.classList.add('liked');
-    btn.innerHTML = '<span class="heart">♥</span><span>いいね済み</span>';
-    if (fw) { fw.style.display = 'inline-block'; }
-  }
-}
-// いいね／いいね解除トグル（推薦カードボタン）
-function sendLike(toAccount, keyword, btnEl) {
-  if (!MY_ACCOUNT) { return; }
-  var fw = document.getElementById('followwrap-' + toAccount.replace(/[^a-zA-Z0-9]/g, '_'));
-  if (likedAccounts[toAccount]) {
-    // いいね解除
-    xhrPost('?action=unlike', { from: MY_ACCOUNT, to: toAccount }, function(err, data) {
-      console.log('[DEBUG] unlike: removed=' + (data ? data.removed : 'err'));
-    });
-    likedAccounts[toAccount] = false;
-    btnEl.classList.remove('liked');
-    btnEl.innerHTML = '<span class="heart">♡</span><span>いいね</span>';
-    if (fw) { fw.style.display = 'none'; }
-  } else {
-    // いいね
-    xhrPost('?action=like', { from: MY_ACCOUNT, to: toAccount, keyword: keyword }, function(err, data) {
-      console.log('[DEBUG] like: added=' + (data ? data.added : 'err'));
-    });
-    likedAccounts[toAccount] = true;
-    btnEl.classList.add('liked');
-    btnEl.innerHTML = '<span class="heart">♥</span><span>いいね済み</span>';
-    if (fw) { fw.style.display = 'inline-block'; }
-  }
-}
-function restoreLikedButtons() {
-  if (likedAccounts[VIEW_ACCOUNT]) {
-    var btn = g('likebtn-profile');
-    if (btn) { btn.classList.add('liked'); btn.innerHTML = '<span class="heart">♥</span><span>いいね済み</span>'; }
-    var fw = g('followwrap-profile');
-    if (fw) { fw.style.display = 'inline-block'; }
-  }
-  for (var toAccount in likedAccounts) {
-    var safeId = toAccount.replace(/[^a-zA-Z0-9]/g, '_');
-    var btn = document.getElementById('likebtn-' + safeId);
-    if (btn) { btn.classList.add('liked'); btn.innerHTML = '<span class="heart">♥</span><span>いいね済み</span>'; }
-    var fw = document.getElementById('followwrap-' + safeId);
-    if (fw) { fw.style.display = 'inline-block'; }
-  }
-}
-function renderRecommended(data) {
-  var area = g('view-recommended');
-  if (!data.accounts || data.accounts.length === 0) {
-    area.innerHTML = '<div class="empty">共通キーワードを持つ<br>アカウントが見つかりません</div>';
-    return;
-  }
-  var html = '';
-  for (var i = 0; i < data.accounts.length; i++) {
-    var a      = data.accounts[i];
-    var user   = a.user || {};
-    var safeId = a.account.replace(/[^a-zA-Z0-9]/g, '_');
-    var firstCommon = a.common_keywords.length > 0 ? a.common_keywords[0] : '';
-    var kwHtml = '';
-    for (var j = 0; j < a.keywords.length; j++) {
-      var kw       = a.keywords[j];
-      var isCommon = a.common_keywords.indexOf(kw) !== -1;
-      if (isCommon) {
-        kwHtml += '<span class="akwtag common" onclick="scrollToKw(\'' + escHtml(kw) + '\')" title="→ 右の考察へ">◈ #' + escHtml(kw) + '</span>';
-      } else {
-        kwHtml += '<a href="' + cmsUrl(kw, '') + '" target="_blank" class="akwtag normal">#' + escHtml(kw) + '</a>';
-      }
-    }
-    html +=
-      '<div class="acard" id="acard-' + safeId + '">' +
-        '<div class="acard-head">' +
-          '<div class="acard-left">' +
-            '<div class="ahandle">' +
-              '<a href="aiknowledgesns.php?view=account&u=' + encodeURIComponent(a.account) + '">@' + escHtml(a.account) + '</a>' +
-              (user.name ? '<span style="font-family:Exo 2,sans-serif;font-size:.78rem;color:var(--text);margin-left:8px;">' + escHtml(user.name) + '</span>' : '') +
-              '<span class="common-badge">共通 ' + a.common_count + '</span>' +
-            '</div>' +
-            (user.public_metrics ? '<div style="font-family:Share Tech Mono,monospace;font-size:.63rem;color:var(--vm);margin-bottom:6px;">フォロワー <span style="color:var(--text);">' + Number(user.public_metrics.followers_count).toLocaleString() + '</span> &nbsp;フォロー <span style="color:var(--text);">' + Number(user.public_metrics.following_count).toLocaleString() + '</span></div>' : '') +
-            (user.description ? '<div class="abio">' + escHtml(user.description) + '</div>' : '<div class="abio" style="font-style:italic;font-size:.72rem;">bioなし — <a href="https://x.com/' + escHtml(a.account) + '" target="_blank" style="color:var(--blue);">Xで確認 →</a></div>') +
-          '</div>' +
-          '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">' +
-            '<button class="like-btn" id="likebtn-' + safeId + '" onclick="sendLike(\'' + escHtml(a.account) + '\',\'' + escHtml(firstCommon) + '\',this)"><span class="heart">♡</span><span>いいね</span></button>' +
-            '<span id="followwrap-' + safeId + '" style="display:none;"><a href="https://x.com/intent/follow?screen_name=' + escHtml(a.account) + '" target="_blank" style="font-family:Share Tech Mono,monospace;font-size:.65rem;color:#1da1f2;border:1px solid rgba(29,161,242,.35);padding:4px 10px;border-radius:3px;text-decoration:none;background:rgba(29,161,242,.08);">X フォロー →</a></span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="akws">' + kwHtml + '</div>' +
-      '</div>';
-  }
-  area.innerHTML = html;
-}
-function renderTimeline(data) {
-  var kwHtml = '';
-  for (var i = 0; i < data.keywords.length; i++) {
-    var kw = data.keywords[i];
-    kwHtml += '<a href="' + cmsUrl(kw, '') + '" target="_blank" class="kwtag-link">#' + escHtml(kw) + '</a>';
-  }
-  g('view-kwlist').innerHTML = kwHtml;
-  var area = g('view-timeline');
-  if (!data.items || data.items.length === 0) {
-    area.innerHTML = '<div class="empty">考察データなし<br><small>AIKnowledgeCMSでキーワードを生成してください</small></div>';
-    return;
-  }
-  var html = '';
-  for (var i = 0; i < data.items.length; i++) {
-    var item   = data.items[i];
-    var safeKw = item.keyword.replace(/[^a-zA-Z0-9]/g, '_');
-    html +=
-      '<div class="tl-item" id="tl-' + safeKw + '">' +
-        '<div class="tl-kw-row">' +
-          '<a href="' + escHtml(item.cms_url) + '" target="_blank" class="tl-kwtag">#' + escHtml(item.keyword) + '</a>' +
-          '<span class="tl-date">' + escHtml(item.date) + '</span>' +
-        '</div>' +
-        '<div class="tl-body" id="tlbody-' + safeKw + '">' + escHtml(item.analysis) + '</div>' +
-        '<div class="tl-footer">' +
-          '<button class="expand-btn" id="tlbtn-' + safeKw + '" onclick="toggleExpand(\'' + safeKw + '\')">▼ 続きを読む</button>' +
-          '<a href="' + escHtml(item.cms_url) + '" target="_blank" class="cms-link">→ AIKnowledgeCMS</a>' +
-        '</div>' +
-      '</div>';
-  }
-  area.innerHTML = html;
-}
-
-var recAccount = (VIEW_ACCOUNT === MY_ACCOUNT) ? MY_ACCOUNT : VIEW_ACCOUNT;
-
-// 未ログインの場合はいいね復元をスキップ
-if (MY_ACCOUNT) {
-  xhrGet('?action=sent_likes&account=' + encodeURIComponent(MY_ACCOUNT), function(err, data) {
-    if (!err && data && data.ok && data.sent) {
-      for (var i = 0; i < data.sent.length; i++) { likedAccounts[data.sent[i]] = true; }
-    }
-    xhrGet('?action=recommended&account=' + encodeURIComponent(recAccount), function(err2, data2) {
-      if (err2 || !data2 || !data2.ok) {
-        g('view-recommended').innerHTML = '<div class="empty">取得失敗</div>';
-        return;
-      }
-      renderRecommended(data2);
-      restoreLikedButtons();
+(function(){
+  var input = document.getElementById('account-search');
+  if (!input) { return; }
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.account-card'));
+  input.addEventListener('input', function(){
+    var q = input.value.toLowerCase().trim();
+    cards.forEach(function(card){
+      card.style.display = !q || card.getAttribute('data-search').indexOf(q) !== -1 ? '' : 'none';
     });
   });
-} else {
-  xhrGet('?action=recommended&account=' + encodeURIComponent(recAccount), function(err2, data2) {
-    if (err2 || !data2 || !data2.ok) {
-      g('view-recommended').innerHTML = '<div class="empty">取得失敗</div>';
-      return;
-    }
-    renderRecommended(data2);
-  });
-}
-
-xhrGet('?action=timeline&account=' + encodeURIComponent(VIEW_ACCOUNT), function(err, data) {
-  if (err || !data || !data.ok) {
-    g('view-timeline').innerHTML = '<div class="empty">取得失敗</div>';
-    return;
-  }
-  renderTimeline(data);
-});
-
-xhrGet('?action=get_associate&account=' + encodeURIComponent(VIEW_ACCOUNT), function(err, data) {
-  if (err || !data || !data.ok) { return; }
-  var isOwn = (VIEW_ACCOUNT === MY_ACCOUNT);
-  if (isOwn && MY_ACCOUNT) {
-    renderAssociateEdit(data);
-  }
-});
-
-function buildAssocUrl(url, assocId) {
-  if (!assocId) { return url; }
-  return url + (url.indexOf('?') !== -1 ? '&' : '?') + 'tag=' + encodeURIComponent(assocId);
-}
-
-// adwidget.php JSONP で広告表示（アカウントページ）
-function aigmExecScripts(el) {
-  var scripts = el.querySelectorAll('script');
-  for (var i = 0; i < scripts.length; i++) {
-    var s = document.createElement('script');
-    s.textContent = scripts[i].textContent;
-    document.body.appendChild(s);
-  }
-}
-function aigmAdView(data) {
-  if (!data || !data.html) { return; }
-  var div = document.createElement('div');
-  div.innerHTML = data.html;
-  var insertAfter = document.querySelector('.assoc-edit') || document.querySelector('.profile-card');
-  if (insertAfter) {
-    insertAfter.parentNode.insertBefore(div, insertAfter.nextSibling);
-    aigmExecScripts(div);
-  }
-}
-function aigmAdGate(data) {
-  if (!data || !data.ok || !data.html) { return; }
-  var container = document.getElementById('aigm-ad-gate');
-  if (!container) { return; }
-  container.innerHTML = data.html;
-}
-// gate広告（ページロード時）
-(function() {
-  var sg = document.createElement('script');
-  sg.src = 'https://aiknowledgecms.exbridge.jp/adwidget.php?callback=aigmAdGate&slot=gate&limit=3';
-  document.body.appendChild(sg);
-})();
-(function() {
-  var kw = (typeof VIEW_KEYWORDS !== 'undefined' && VIEW_KEYWORDS.length > 0) ? VIEW_KEYWORDS[0] : '';
-  var s = document.createElement('script');
-  s.src = 'https://aiknowledgecms.exbridge.jp/adwidget.php?callback=aigmAdView&slot=account&limit=4&kw=' + encodeURIComponent(kw);
-  document.body.appendChild(s);
-})();
-
-function renderAssociateEdit(data) {
-  var assocId      = data.associate_id  || '';
-  var items        = data.items         || [];
-  var defaultItems = data.default_items || [];
-  var isAdmin      = (VIEW_ACCOUNT === 'xb_bittensor');
-  var siteUrl = 'aiknowledgecms.exbridge.jp';
-  var html = '<div class="assoc-edit"><div class="assoc-edit-title">◯ AMAZON アソシエイト設定</div>';
-  html += '<div class="assoc-notice">' +
-    '<div class="assoc-notice-title">⚠ 事前にサイト登録が必要です</div>' +
-    '<div class="assoc-notice-body">' +
-      'AmazonアソシエイトIDを使用するには、Amazon管理画面で当サイトを登録してください。<br>' +
-      '<strong>登録するURL：</strong><br>' +
-      '<code class="assoc-site-url">' + escHtml(siteUrl) + '</code><br><br>' +
-      '手順：<a href="https://affiliate.amazon.co.jp/" target="_blank" class="assoc-link">Amazonアソシエイト管理画面</a> → ' +
-      'アカウント → サイトとアプリの管理 → 上記URLを追加' +
-    '</div>' +
-  '</div>';
-  html += '<input class="assoc-input" id="assoc-id-input" type="text" placeholder="アソシエイトID (例: xxxxx-22)" value="' + escHtml(assocId) + '">';
-  html += '<div class="assoc-edit-title" style="margin-top:10px;">商品リンク（手動登録）</div>';
-  html += '<div id="assoc-items-wrap">';
-  for (var i = 0; i < items.length; i++) {
-    html += assocItemRow(items[i].title, items[i].url);
-  }
-  html += '</div>';
-  html += '<button class="assoc-add-btn" onclick="addAssocItem()">＋ 商品を追加</button><br>';
-  html += '<button class="assoc-save-btn" onclick="saveAssociate()">保存</button>';
-  if (isAdmin) {
-    html += '<div class="assoc-edit-title" style="margin-top:18px;border-top:1px solid rgba(255,153,0,.2);padding-top:14px;">◯ 管理者：システムデフォルト設定</div>';
-    html += '<div style="font-size:.7rem;color:var(--muted);margin-bottom:8px;">ID未設定ユーザーのページに使われる管理者アソシエイトID</div>';
-    html += '<input class="assoc-input" id="admin-assoc-id-input" type="text" placeholder="管理者アソシエイトID (例: xxxxx-22)" value="' + escHtml(data.default_associate_id || '') + '">';
-    html += '<div class="assoc-edit-title" style="margin-top:10px;">デフォルト商品リスト</div>';
-    html += '<div style="font-size:.7rem;color:var(--muted);margin-bottom:8px;">ユーザーが手動登録していない場合に表示される商品。ユーザー自身のアソシエイトIDで表示される。</div>';
-    html += '<div id="admin-items-wrap">';
-    for (var j = 0; j < defaultItems.length; j++) {
-      html += assocAdminItemRow(defaultItems[j].title, defaultItems[j].url);
-    }
-    html += '</div>';
-    html += '<button class="assoc-add-btn" onclick="addAdminItem()">＋ デフォルト商品を追加</button><br>';
-    html += '<button class="assoc-save-btn" onclick="saveAdminItems()">デフォルト商品を保存</button>';
-  }
-  html += '</div>';
-  var profileCard = document.querySelector('.profile-card');
-  if (profileCard) {
-    var div = document.createElement('div');
-    div.innerHTML = html;
-    profileCard.parentNode.insertBefore(div, profileCard.nextSibling);
-  }
-}
-
-function asinFromUrl(url) {
-  var m = (url || '').match(/\/dp\/([A-Z0-9]{10})/);
-  return m ? m[1] : '';
-}
-
-function assocItemRow(title, url) {
-  var asin = asinFromUrl(url) || '';
-  var uid  = 'asin_' + Math.random().toString(36).substr(2, 6);
-  return '<div class="assoc-item-row" id="' + uid + '">' +
-    '<input type="text" placeholder="ASIN (例: B01N6UHJI8)" value="' + escHtml(asin) + '" class="assoc-item-asin" style="max-width:160px;" oninput="fetchAsin(this,\'' + uid + '\')">' +
-    '<input type="text" placeholder="商品タイトル（自動取得）" value="' + escHtml(title || '') + '" class="assoc-item-title" readonly style="flex:1;opacity:.8;">' +
-    '<input type="hidden" value="' + escHtml(url || '') + '" class="assoc-item-url">' +
-    '<button class="assoc-remove-btn" onclick="this.closest(\'.assoc-item-row\').remove()">削除</button>' +
-  '</div>';
-}
-
-function fetchAsin(inputEl, rowId) {
-  var asin = inputEl.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  if (asin.length !== 10) { return; }
-  var row       = document.getElementById(rowId);
-  if (!row) { return; }
-  var titleEl   = row.querySelector('.assoc-item-title');
-  var urlEl     = row.querySelector('.assoc-item-url');
-  titleEl.value = '取得中...';
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', '?action=fetch_asin&asin=' + encodeURIComponent(asin), true);
-  xhr.onreadystatechange = function() {
-    if (xhr.readyState !== 4) { return; }
-    try {
-      var data = JSON.parse(xhr.responseText);
-      if (data.ok) {
-        titleEl.value = data.title;
-        urlEl.value   = data.url;
-      } else {
-        titleEl.value = '取得失敗 — 手動で入力してください';
-        urlEl.value   = 'https://www.amazon.co.jp/dp/' + asin;
-      }
-    } catch(e) { titleEl.value = 'エラー'; }
-  };
-  xhr.send();
-}
-
-function addAssocItem() {
-  var wrap = g('assoc-items-wrap');
-  if (!wrap) { return; }
-  var div = document.createElement('div');
-  div.innerHTML = assocItemRow('', '');
-  wrap.appendChild(div.firstChild);
-}
-
-function assocAdminItemRow(title, url) {
-  var asin = asinFromUrl(url) || '';
-  var uid  = 'adm_' + Math.random().toString(36).substr(2, 6);
-  return '<div class="assoc-item-row" id="' + uid + '">' +
-    '<input type="text" placeholder="ASIN (例: B01N6UHJI8)" value="' + escHtml(asin) + '" class="admin-item-asin" style="max-width:160px;" oninput="fetchAsinAdmin(this,\'' + uid + '\')">' +
-    '<input type="text" placeholder="商品タイトル（自動取得）" value="' + escHtml(title || '') + '" class="admin-item-title" readonly style="flex:1;opacity:.8;">' +
-    '<input type="hidden" value="' + escHtml(url || '') + '" class="admin-item-url">' +
-    '<button class="assoc-remove-btn" onclick="this.closest(\'.assoc-item-row\').remove()">削除</button>' +
-  '</div>';
-}
-
-function fetchAsinAdmin(inputEl, rowId) {
-  var asin = inputEl.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
-  if (asin.length !== 10) { return; }
-  var row     = document.getElementById(rowId);
-  if (!row) { return; }
-  var titleEl = row.querySelector('.admin-item-title');
-  var urlEl   = row.querySelector('.admin-item-url');
-  titleEl.value = '取得中...';
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', '?action=fetch_asin&asin=' + encodeURIComponent(asin), true);
-  xhr.onreadystatechange = function() {
-    if (xhr.readyState !== 4) { return; }
-    try {
-      var data = JSON.parse(xhr.responseText);
-      if (data.ok) {
-        titleEl.value = data.title;
-        urlEl.value   = data.url;
-      } else {
-        titleEl.value = '取得失敗 — 手動で入力してください';
-        titleEl.readOnly = false;
-        urlEl.value   = 'https://www.amazon.co.jp/dp/' + asin;
-      }
-    } catch(e) { titleEl.value = 'エラー'; }
-  };
-  xhr.send();
-}
-
-function addAdminItem() {
-  var wrap = g('admin-items-wrap');
-  if (!wrap) { return; }
-  var div = document.createElement('div');
-  div.innerHTML = assocAdminItemRow('', '');
-  wrap.appendChild(div.firstChild);
-}
-
-function saveAdminItems() {
-  var adminId = g('admin-assoc-id-input') ? g('admin-assoc-id-input').value.trim() : '';
-  var rows  = document.querySelectorAll('#admin-items-wrap .assoc-item-row');
-  var items = [];
-  for (var i = 0; i < rows.length; i++) {
-    var a = rows[i].querySelector('.admin-item-asin');
-    var t = rows[i].querySelector('.admin-item-title');
-    var u = rows[i].querySelector('.admin-item-url');
-    if (a && a.value.trim() && u && !u.value.trim()) {
-      var asin = a.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
-      if (asin.length === 10) { u.value = 'https://www.amazon.co.jp/dp/' + asin; }
-    }
-    if (t && u && t.value.trim() && u.value.trim()) {
-      items.push({ title: t.value.trim(), url: u.value.trim() });
-    }
-  }
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', '?action=save_admin_items', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.onreadystatechange = function() {
-    if (xhr.readyState !== 4) { return; }
-    try {
-      var res = JSON.parse(xhr.responseText);
-      if (res.ok) { alert('デフォルト商品を保存しました（' + res.count + '件）'); }
-      else { alert('保存失敗: ' + (res.reason || '不明')); }
-    } catch(e) { alert('エラー'); }
-  };
-  xhr.send(JSON.stringify({ associate_id: adminId, items: items }));
-}
-
-function saveAssociate() {
-  var assocId = g('assoc-id-input') ? g('assoc-id-input').value.trim() : '';
-  var rows    = document.querySelectorAll('#assoc-items-wrap .assoc-item-row');
-  var items   = [];
-  for (var i = 0; i < rows.length; i++) {
-    var t = rows[i].querySelector('.assoc-item-title');
-    var u = rows[i].querySelector('.assoc-item-url');
-    if (t && u && t.value.trim() && u.value.trim()) {
-      items.push({ title: t.value.trim(), url: u.value.trim() });
-    }
-  }
-  var asinRows = document.querySelectorAll('#assoc-items-wrap .assoc-item-row');
-  asinRows.forEach(function(row) {
-    var a = row.querySelector('.assoc-item-asin');
-    var u = row.querySelector('.assoc-item-url');
-    var t = row.querySelector('.assoc-item-title');
-    if (a && a.value.trim() && u && !u.value.trim()) {
-      var asin = a.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase();
-      if (asin.length === 10) {
-        u.value = 'https://www.amazon.co.jp/dp/' + asin;
-        if (t && !t.value.trim()) { t.value = asin; }
-      }
-    }
-  });
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', '?action=save_associate', true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.onreadystatechange = function() {
-    if (xhr.readyState !== 4) { return; }
-    try {
-      var res = JSON.parse(xhr.responseText);
-      if (res.ok) { alert('保存しました'); }
-      else { alert('保存失敗: ' + (res.reason || '不明')); }
-    } catch(e) { alert('エラー'); }
-  };
-  xhr.send(JSON.stringify({ account: VIEW_ACCOUNT, associate_id: assocId, items: items }));
-}
-</script>
-
-  <?php else: ?>
-  <!-- ======== メインSNS画面（ログイン済み・キーワードあり） ======== -->
-
-  <div class="like-notify" id="like-notify">
-    <div class="like-notify-title">♥ あなたの知識に興味を持った人がいます</div>
-    <div id="like-notify-body"></div>
-  </div>
-
-  <div class="top-nav">
-    <a href="?view=account&u=<?php echo rawurlencode($session_user); ?>" class="top-nav-btn">◎ マイページ</a>
-    <a href="airadarx.php" class="top-nav-btn">← AIRadarX</a>
-  </div>
-
-  <div class="grid">
-    <div>
-      <div class="panel">
-        <div class="pt">◯ RECOMMENDED ACCOUNTS — @<?php echo htmlspecialchars($session_user); ?></div>
-        <div id="recommended-area"><div class="loading">◎ loading...</div></div>
-      </div>
-    </div>
-    <div>
-      <div class="panel" style="margin-bottom:12px;">
-        <div class="pt">◯ OSS TIMELINE</div>
-        <?php
-        $oss_file2  = __DIR__ . '/data/oss_posts.json';
-        $oss_posts2 = array();
-        if (file_exists($oss_file2)) {
-            $oss_posts2 = json_decode(file_get_contents($oss_file2), true);
-            if (!$oss_posts2) $oss_posts2 = array();
-        }
-        $oss_recent2 = array_slice($oss_posts2, 0, 5);
-        if (empty($oss_recent2)):
-        ?>
-        <div style="padding:12px;font-size:13px;color:#888;">投稿がありません</div>
-        <?php else: ?>
-        <ul style="list-style:none;padding:0;margin:0;">
-        <?php foreach ($oss_recent2 as $op2): ?>
-          <li style="border-bottom:1px solid #1e2330;padding:10px 14px;">
-            <a href="https://aiknowledgecms.exbridge.jp/oss.php?id=<?php echo urlencode($op2['id']); ?>"
-               style="color:#8b9cf4;text-decoration:none;font-size:13px;font-weight:600;display:block;margin-bottom:3px;"
-               target="_blank">
-              <?php echo htmlspecialchars(mb_substr($op2['title'], 0, 50)); ?>
-            </a>
-            <span style="font-size:11px;color:#555;"><?php echo htmlspecialchars(substr($op2['created_at'], 0, 10)); ?></span>
-          </li>
-        <?php endforeach; ?>
-        </ul>
-        <div style="padding:8px 14px;">
-          <a href="https://aiknowledgecms.exbridge.jp/oss.php" target="_blank"
-             style="font-size:12px;color:#6c63ff;text-decoration:none;">&#x2192; すべて見る</a>
-        </div>
-        <?php endif; ?>
-      </div>
-      <div class="panel">
-        <div class="pt">◯ KNOWLEDGE TIMELINE</div>
-        <div class="kwlist" id="my-kwlist"></div>
-        <div id="timeline-area"><div class="loading">◎ loading...</div></div>
-      </div>
-    </div>
-  </div>
-
-<script>
-var MY_ACCOUNT   = '<?php echo addslashes($session_user); ?>';
-var MY_KEYWORDS  = <?php echo json_encode(array_values($my_keywords), JSON_UNESCAPED_UNICODE); ?>;
-var likedAccounts = {};
-var expandStates  = {};
-var CMS_BASE = 'https://aiknowledgecms.exbridge.jp/aithinkingmedia.php';
-
-function g(id) { return document.getElementById(id); }
-function xhrGet(url, cb) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
-  xhr.onreadystatechange = function () {
-    if (xhr.readyState !== 4) { return; }
-    try { cb(null, JSON.parse(xhr.responseText)); } catch (e) { cb(e, null); }
-  };
-  xhr.send();
-}
-function xhrPost(url, payload, cb) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('POST', url, true);
-  xhr.setRequestHeader('Content-Type', 'application/json');
-  xhr.onreadystatechange = function () {
-    if (xhr.readyState !== 4) { return; }
-    try { cb(null, JSON.parse(xhr.responseText)); } catch (e) { cb(e, null); }
-  };
-  xhr.send(JSON.stringify(payload));
-}
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-function cmsUrl(kw, date) {
-  var url = CMS_BASE + '?kw=' + encodeURIComponent(kw);
-  if (date) { url += '&base_date=' + encodeURIComponent(date); }
-  return url;
-}
-function scrollToKw(kw) {
-  var safeKw = kw.replace(/[^a-zA-Z0-9\u3040-\u30ff\u4e00-\u9fff]/g, '_');
-  var el = document.getElementById('tl-' + safeKw);
-  if (!el) { return; }
-  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  el.className = el.className + ' scrolled';
-  setTimeout(function() { el.className = el.className.replace(' scrolled', ''); }, 900);
-}
-function toggleExpand(id) {
-  var body = document.getElementById('tlbody-' + id);
-  var btn  = document.getElementById('tlbtn-' + id);
-  if (!body) { return; }
-  if (expandStates[id]) {
-    body.className = 'tl-body';
-    btn.textContent = '▼ 続きを読む';
-    expandStates[id] = false;
-  } else {
-    body.className = 'tl-body expanded';
-    btn.textContent = '▲ 閉じる';
-    expandStates[id] = true;
-  }
-}
-function sendLike(toAccount, keyword, btnEl) {
-  var fw = document.getElementById('followwrap-' + toAccount.replace(/[^a-zA-Z0-9]/g, '_'));
-  if (likedAccounts[toAccount]) {
-    // いいね解除
-    xhrPost('?action=unlike', { from: MY_ACCOUNT, to: toAccount }, function(err, data) {
-      console.log('[DEBUG] unlike: removed=' + (data ? data.removed : 'err'));
-    });
-    likedAccounts[toAccount] = false;
-    btnEl.classList.remove('liked');
-    btnEl.innerHTML = '<span class="heart">♡</span><span>いいね</span>';
-    if (fw) { fw.style.display = 'none'; }
-  } else {
-    // いいね
-    xhrPost('?action=like', { from: MY_ACCOUNT, to: toAccount, keyword: keyword }, function(err, data) {
-      console.log('[DEBUG] like: added=' + (data ? data.added : 'err'));
-    });
-    likedAccounts[toAccount] = true;
-    btnEl.classList.add('liked');
-    btnEl.innerHTML = '<span class="heart">♥</span><span>いいね済み</span>';
-    if (fw) { fw.style.display = 'inline-block'; }
-  }
-}
-function renderLikeNotify(data) {
-  if (!data || !data.received || data.received.length === 0) { return; }
-  var html = '';
-  for (var i = 0; i < data.received.length; i++) {
-    var like = data.received[i];
-    html += '<span class="like-from">@' + escHtml(like.from) + '</span>';
-    if (like.keyword) {
-      html += '<span style="font-size:.65rem;color:var(--muted);">（' + escHtml(like.keyword) + '）</span> ';
-    }
-  }
-  g('like-notify-body').innerHTML = html;
-  g('like-notify').className = 'like-notify show';
-}
-function renderRecommended(data) {
-  var area = g('recommended-area');
-  if (!data.accounts || data.accounts.length === 0) {
-    area.innerHTML = '<div class="empty">共通キーワードを持つ<br>アカウントが見つかりません<br><br>' +
-      '<small>AIRadarXで他のアカウントをスキャンすると<br>ここに表示されます</small></div>';
-    return;
-  }
-  var html = '';
-  for (var i = 0; i < data.accounts.length; i++) {
-    var a      = data.accounts[i];
-    var user   = a.user || {};
-    var safeId = a.account.replace(/[^a-zA-Z0-9]/g, '_');
-    var firstCommon = a.common_keywords.length > 0 ? a.common_keywords[0] : '';
-    var kwHtml = '';
-    for (var j = 0; j < a.keywords.length; j++) {
-      var kw       = a.keywords[j];
-      var isCommon = a.common_keywords.indexOf(kw) !== -1;
-      if (isCommon) {
-        kwHtml += '<span class="akwtag common" onclick="scrollToKw(\'' + escHtml(kw) + '\')" title="→ 右の考察へ">◈ #' + escHtml(kw) + '</span>';
-      } else {
-        kwHtml += '<a href="' + cmsUrl(kw, '') + '" target="_blank" class="akwtag normal">#' + escHtml(kw) + '</a>';
-      }
-    }
-    html +=
-      '<div class="acard" id="acard-' + safeId + '">' +
-        '<div class="acard-head">' +
-          '<div class="acard-left">' +
-            '<div class="ahandle">' +
-              '<a href="aiknowledgesns.php?view=account&u=' + encodeURIComponent(a.account) + '">@' + escHtml(a.account) + '</a>' +
-              (user.name ? '<span style="font-family:\'Exo 2\',sans-serif;font-size:.78rem;color:var(--text);margin-left:8px;">' + escHtml(user.name) + '</span>' : '') +
-              '<span class="common-badge">共通 ' + a.common_count + '</span>' +
-            '</div>' +
-            (user.public_metrics ? '<div style="font-family:\'Share Tech Mono\',monospace;font-size:.63rem;color:var(--vm);margin-bottom:6px;">フォロワー <span style="color:var(--text);">' + Number(user.public_metrics.followers_count).toLocaleString() + '</span> &nbsp;フォロー <span style="color:var(--text);">' + Number(user.public_metrics.following_count).toLocaleString() + '</span></div>' : '') +
-            (user.description ? '<div class="abio">' + escHtml(user.description) + '</div>' : '<div class="abio" style="font-style:italic;font-size:.72rem;">bioなし — <a href="https://x.com/' + escHtml(a.account) + '" target="_blank" style="color:var(--blue);">Xで確認 →</a></div>') +
-          '</div>' +
-          '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">' +
-            '<button class="like-btn" id="likebtn-' + safeId + '" onclick="sendLike(\'' + escHtml(a.account) + '\',\'' + escHtml(firstCommon) + '\',this)"><span class="heart">♡</span><span>いいね</span></button>' +
-            '<span id="followwrap-' + safeId + '" style="display:none;"><a href="https://x.com/intent/follow?screen_name=' + escHtml(a.account) + '" target="_blank" style="font-family:\'Share Tech Mono\',monospace;font-size:.65rem;color:#1da1f2;border:1px solid rgba(29,161,242,.35);padding:4px 10px;border-radius:3px;text-decoration:none;background:rgba(29,161,242,.08);">X フォロー →</a></span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="akws">' + kwHtml + '</div>' +
-      '</div>';
-  }
-  area.innerHTML = html;
-}
-function renderTimeline(data) {
-  var kwHtml = '';
-  for (var i = 0; i < data.keywords.length; i++) {
-    var kw = data.keywords[i];
-    kwHtml += '<a href="' + cmsUrl(kw, '') + '" target="_blank" class="kwtag-link">#' + escHtml(kw) + '</a>';
-  }
-  g('my-kwlist').innerHTML = kwHtml;
-  var area = g('timeline-area');
-  if (!data.items || data.items.length === 0) {
-    area.innerHTML = '<div class="empty">考察データなし<br><small>AIKnowledgeCMSでキーワードを生成してください</small></div>';
-    return;
-  }
-  var html = '';
-  for (var i = 0; i < data.items.length; i++) {
-    var item  = data.items[i];
-    var safeKw = item.keyword.replace(/[^a-zA-Z0-9\u3040-\u30ff\u4e00-\u9fff]/g, '_');
-    html +=
-      '<div class="tl-item" id="tl-' + safeKw + '">' +
-        '<div class="tl-kw-row">' +
-          '<a href="' + escHtml(item.cms_url) + '" target="_blank" class="tl-kwtag">#' + escHtml(item.keyword) + '</a>' +
-          '<span class="tl-date">' + escHtml(item.date) + '</span>' +
-        '</div>' +
-        '<div class="tl-body" id="tlbody-' + safeKw + '">' + escHtml(item.analysis) + '</div>' +
-        '<div class="tl-footer">' +
-          '<button class="expand-btn" id="tlbtn-' + safeKw + '" onclick="toggleExpand(\'' + safeKw + '\')">▼ 続きを読む</button>' +
-          '<a href="' + escHtml(item.cms_url) + '" target="_blank" class="cms-link">→ AIKnowledgeCMS</a>' +
-        '</div>' +
-      '</div>';
-  }
-  area.innerHTML = html;
-}
-
-function buildAssocUrl(url, assocId) {
-  if (!assocId) { return url; }
-  return url + (url.indexOf('?') !== -1 ? '&' : '?') + 'tag=' + encodeURIComponent(assocId);
-}
-function restoreLikedButtons() {
-  for (var toAccount in likedAccounts) {
-    var safeId = toAccount.replace(/[^a-zA-Z0-9]/g, '_');
-    var btn = document.getElementById('likebtn-' + safeId);
-    if (btn) { btn.classList.add('liked'); btn.innerHTML = '<span class="heart">♥</span><span>いいね済み</span>'; }
-    var followWrap = document.getElementById('followwrap-' + safeId);
-    if (followWrap) { followWrap.style.display = 'inline-block'; }
-  }
-}
-
-xhrGet('?action=my_likes&account=' + encodeURIComponent(MY_ACCOUNT), function(err, data) {
-  if (!err && data && data.ok) { renderLikeNotify(data); }
-});
-xhrGet('?action=sent_likes&account=' + encodeURIComponent(MY_ACCOUNT), function(err, data) {
-  if (!err && data && data.ok && data.sent) {
-    for (var i = 0; i < data.sent.length; i++) { likedAccounts[data.sent[i]] = true; }
-  }
-  xhrGet('?action=recommended&account=' + encodeURIComponent(MY_ACCOUNT), function(err2, data2) {
-    if (err2 || !data2 || !data2.ok) {
-      g('recommended-area').innerHTML = '<div class="empty">取得失敗</div>';
-      return;
-    }
-    renderRecommended(data2);
-    restoreLikedButtons();
-  });
-});
-xhrGet('?action=timeline&account=' + encodeURIComponent(MY_ACCOUNT), function(err, data) {
-  if (err || !data || !data.ok) {
-    g('timeline-area').innerHTML = '<div class="empty">取得失敗</div>';
-    return;
-  }
-  renderTimeline(data);
-});
-
-// adwidget.php JSONP で広告表示（マイページ）
-function aigmAdMy(data) {
-  if (!data || !data.html) { return; }
-  var div = document.createElement('div');
-  div.innerHTML = data.html;
-  var topNav = document.querySelector('.top-nav');
-  if (topNav) {
-    topNav.parentNode.insertBefore(div, topNav.nextSibling);
-    aigmExecScripts(div);
-  }
-}
-(function() {
-  var kw = (typeof MY_KEYWORDS !== 'undefined' && MY_KEYWORDS.length > 0) ? MY_KEYWORDS[0] : '';
-  var s = document.createElement('script');
-  s.src = 'https://aiknowledgecms.exbridge.jp/adwidget.php?callback=aigmAdMy&slot=mypage&limit=4&kw=' + encodeURIComponent(kw);
-  document.body.appendChild(s);
 })();
 </script>
-  <?php endif; ?>
-</div>
-<footer class="site-footer">
-  当サイトはAmazonアソシエイト・プログラムに参加しています。商品リンクにはアフィリエイトリンクが含まれる場合があります。
-</footer>
 </body>
 </html>
