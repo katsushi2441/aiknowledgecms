@@ -1,9 +1,16 @@
 <?php
+require_once __DIR__ . '/auth_common.php';
 date_default_timezone_set('Asia/Tokyo');
 
-$BASE_URL = 'https://aiknowledgecms.exbridge.jp';
+$BASE_URL = AIGM_BASE_URL;
 $DATA_DIR = __DIR__ . '/data';
 $THIS_FILE = 'aiknowledgesns.php';
+
+url2ai_auth_handle_login_flow('/' . $THIS_FILE);
+$auth = url2ai_auth_bootstrap();
+$logged_in = $auth['logged_in'];
+$session_user = $auth['session_user'];
+$is_admin = $auth['is_admin'];
 
 function h($s) {
     return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
@@ -198,6 +205,8 @@ a{color:inherit;text-decoration:none}
 .bar{max-width:1180px;margin:0 auto;padding:15px 22px;display:flex;align-items:center;gap:18px}
 .logo{font-weight:800;font-size:18px;letter-spacing:-.03em}.logo span{color:var(--blue)}
 .nav{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.nav a{font-size:12px;font-weight:700;color:#475569;border:1px solid var(--line);border-radius:999px;padding:7px 11px;background:#fff}.nav a:hover{border-color:#bfdbfe;color:var(--blue);background:#eff6ff}
+.nav .user{font-size:12px;font-weight:800;color:#0f766e;border:1px solid #99f6e4;background:#f0fdfa;border-radius:999px;padding:7px 11px}
+.nav .login{color:#fff;background:linear-gradient(135deg,#2563eb,#4f46e5);border-color:transparent}
 .container{max-width:1180px;margin:0 auto;padding:34px 22px 70px}
 .hero{text-align:center;padding:34px 20px 28px}.eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:800;color:#3730a3;background:#eef2ff;border:1px solid #c7d2fe;border-radius:999px;padding:8px 14px;margin-bottom:18px}
 .hero h1{font-size:42px;line-height:1.18;letter-spacing:-.04em;margin:0 0 16px}.hero p{max-width:820px;margin:0 auto;color:#475569;font-size:17px;line-height:1.85}
@@ -227,6 +236,12 @@ a{color:inherit;text-decoration:none}
       <a href="finreport.php">FinReport</a>
       <a href="polymarket.php">Polymarket</a>
       <a href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">GitHub</a>
+      <?php if ($logged_in): ?>
+      <span class="user">@<?php echo h($session_user); ?></span>
+      <a href="<?php echo h($auth['logout_url']); ?>">logout</a>
+      <?php else: ?>
+      <a class="login" href="<?php echo h($auth['login_url']); ?>">X login</a>
+      <?php endif; ?>
     </nav>
   </div>
 </header>
