@@ -204,6 +204,7 @@ $copy_payload = array(
     '件名' => $subject,
     '本文' => $body,
 );
+$assistant_url = $selected && !empty($selected['id']) ? 'http://127.0.0.1:8765/fill?lead_id=' . rawurlencode($selected['id']) : '';
 ?>
 <!doctype html>
 <html lang="ja">
@@ -259,6 +260,7 @@ body{margin:0;background:#f3f5f4;color:#111;font-family:-apple-system,BlinkMacSy
     <div class="tools">
       <?php if($site_url): ?><a class="btn" href="<?php echo h($site_url); ?>" target="_blank" rel="noopener">公式サイト</a><?php endif; ?>
       <?php if($form_url): ?><a class="btn primary" href="<?php echo h($form_url); ?>" target="_blank" rel="noopener">フォームを別タブで開く</a><?php endif; ?>
+      <?php if($form_url): ?><a class="btn primary" href="<?php echo h($assistant_url); ?>" target="_blank" rel="noopener">フォーム自動入力</a><?php endif; ?>
     </div>
   </div>
   <div class="panel-b detail">
@@ -296,10 +298,11 @@ body{margin:0;background:#f3f5f4;color:#111;font-family:-apple-system,BlinkMacSy
       <input type="hidden" name="result" value="フォーム入力準備">
       <input class="input" name="activity_memo" placeholder="記録メモ">
       <button class="btn" name="action" value="form_ready">入力準備を記録</button>
-      <button class="btn primary" name="action" value="form_sent">送信済みにする</button>
+      <button class="btn primary" name="action" value="form_sent">送信済みとして記録</button>
     </form>
 
     <?php if($form_url): ?>
+    <div class="ok">フォーム自動入力を使う前に、ローカルで <code>python3 scripts/form_assistant_server.py</code> を起動してください。</div>
     <iframe class="frame" src="<?php echo h($form_url); ?>"></iframe>
     <div class="muted">iframe表示できないサイトは「フォームを別タブで開く」を使ってください。</div>
     <?php else: ?>
