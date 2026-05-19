@@ -1,3 +1,5 @@
+AddHandler php8.2-script .php
+
 <FilesMatch "^(\.env|leads\.csv)$">
   Require all denied
 </FilesMatch>

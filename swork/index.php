@@ -34,8 +34,16 @@ function swork_write_json($name, $data) {
 }
 
 function swork_csrf_token() {
-    if (empty($_SESSION['swork_csrf'])) $_SESSION['swork_csrf'] = bin2hex(random_bytes(16));
+    if (empty($_SESSION['swork_csrf'])) $_SESSION['swork_csrf'] = swork_random_hex(16);
     return $_SESSION['swork_csrf'];
+}
+
+function swork_random_hex($length) {
+    if (function_exists('random_bytes')) return bin2hex(random_bytes($length));
+    if (function_exists('openssl_random_pseudo_bytes')) return bin2hex(openssl_random_pseudo_bytes($length));
+    $bytes = '';
+    for ($i = 0; $i < $length; $i++) $bytes .= chr(mt_rand(0, 255));
+    return bin2hex($bytes);
 }
 
 function swork_check_csrf() {
