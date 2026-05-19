@@ -97,9 +97,12 @@ function swork_clean_url($url) {
     return filter_var($url, FILTER_VALIDATE_URL) ? $url : '';
 }
 
-function swork_filter_leads($leads, $q, $status) {
+function swork_filter_leads($leads, $q, $status, $form_filter) {
     $out = array();
     foreach ($leads as $lead) {
+        $has_form = !empty($lead['contact_form_url']);
+        if ($form_filter === 'has_form' && !$has_form) continue;
+        if ($form_filter === 'no_form' && $has_form) continue;
         if ($status !== '' && (isset($lead['status']) ? $lead['status'] : '') !== $status) continue;
         if ($q !== '') {
             $haystack = implode(' ', $lead);
@@ -183,7 +186,8 @@ if ($logged_in && $is_admin && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $query = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $status_filter = isset($_GET['status']) ? trim((string)$_GET['status']) : '';
-$leads = swork_filter_leads($all_leads, $query, $status_filter);
+$form_filter = isset($_GET['form']) ? trim((string)$_GET['form']) : 'has_form';
+$leads = swork_filter_leads($all_leads, $query, $status_filter, $form_filter);
 $selected_id = isset($_GET['id']) ? (string)$_GET['id'] : (isset($_POST['lead_id']) ? (string)$_POST['lead_id'] : '');
 $selected = $selected_id !== '' ? swork_find_lead($all_leads, $selected_id) : (count($leads) ? $leads[0] : array());
 $form_url = isset($selected['contact_form_url']) && $selected['contact_form_url'] !== '' ? $selected['contact_form_url'] : '';
@@ -191,6 +195,8 @@ $site_url = isset($selected['website_url']) ? $selected['website_url'] : '';
 $subject = $selected ? swork_subject($selected) : '';
 $body = $selected ? swork_body($selected) : '';
 $statuses = array('new', 'researched', 'drafted', 'form_ready', 'sent', 'replied', 'meeting', 'not_interested', 'invalid');
+$form_ready_count = 0;
+foreach ($all_leads as $lead) if (!empty($lead['contact_form_url'])) $form_ready_count++;
 $copy_payload = array(
     '会社名' => isset($selected['company_name']) ? $selected['company_name'] : '',
     '名前' => 'ご担当者様',
@@ -206,7 +212,7 @@ $copy_payload = array(
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SWork</title>
 <style>
-body{margin:0;background:#f3f5f4;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",Meiryo,sans-serif;line-height:1.55}.top{background:#fff;border-bottom:1px solid #dce2df}.wrap{max-width:1360px;margin:0 auto;padding:16px}.bar{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-weight:800;color:#111;text-decoration:none}.nav,.tools,.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 10px;border:1px solid #c7d0cc;background:#fff;border-radius:4px;color:#111;text-decoration:none;cursor:pointer;font-size:13px;white-space:nowrap}.primary{background:#0f766e;color:#fff;border-color:#0f766e}.danger{background:#fff1f2;border-color:#fecdd3}.grid{display:grid;grid-template-columns:minmax(430px,.95fr) minmax(520px,1.15fr);gap:14px}.panel{background:#fff;border:1px solid #d7dfdb;border-radius:6px;overflow:hidden}.panel-h{padding:11px 13px;border-bottom:1px solid #e8eeeb;display:flex;align-items:center;justify-content:space-between;gap:10px}.panel-b{padding:13px}.search{display:grid;grid-template-columns:1fr 150px auto;gap:8px}.input,select,textarea{box-sizing:border-box;border:1px solid #c7d0cc;border-radius:4px;background:#fff;color:#111;font:inherit;font-size:13px}.input,select{min-height:34px;padding:6px 8px}textarea{width:100%;padding:9px;line-height:1.6}.table-wrap{overflow:auto;max-height:74vh}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 9px;border-bottom:1px solid #edf1ef;text-align:left;vertical-align:top}th{position:sticky;top:0;background:#fbfcfc;z-index:1}.company{font-weight:800}.muted{color:#66706b;font-size:12px}.tag{display:inline-flex;padding:2px 7px;border:1px solid #d7dfdb;border-radius:999px;font-size:11px;color:#44504a;background:#f8faf9}.selected{background:#ecfdf5}.detail{display:grid;gap:12px}.kv{display:grid;grid-template-columns:110px 1fr;gap:8px;font-size:13px}.copybox{min-height:150px}.subject{width:100%}.empty{padding:18px;color:#66706b}.ok{background:#ecfdf5;border:1px solid #a7f3d0;padding:9px;border-radius:4px}.err{background:#fff1f2;border:1px solid #fecdd3;padding:9px;border-radius:4px}.frame{width:100%;height:48vh;border:1px solid #c7d0cc;border-radius:4px;background:#fff}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.full{grid-column:1/-1}.field-copy{display:grid;grid-template-columns:90px 1fr auto;gap:8px;align-items:center}.mini{font-size:12px}@media(max-width:960px){.grid,.search,.form-grid{grid-template-columns:1fr}.table-wrap{max-height:none}.frame{height:58vh}.field-copy{grid-template-columns:1fr}}
+body{margin:0;background:#f3f5f4;color:#111;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans",Meiryo,sans-serif;line-height:1.55}.top{background:#fff;border-bottom:1px solid #dce2df}.wrap{max-width:1360px;margin:0 auto;padding:16px}.bar{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-weight:800;color:#111;text-decoration:none}.nav,.tools,.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.btn{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 10px;border:1px solid #c7d0cc;background:#fff;border-radius:4px;color:#111;text-decoration:none;cursor:pointer;font-size:13px;white-space:nowrap}.primary{background:#0f766e;color:#fff;border-color:#0f766e}.danger{background:#fff1f2;border-color:#fecdd3}.grid{display:grid;grid-template-columns:minmax(430px,.95fr) minmax(520px,1.15fr);gap:14px}.panel{background:#fff;border:1px solid #d7dfdb;border-radius:6px;overflow:hidden}.panel-h{padding:11px 13px;border-bottom:1px solid #e8eeeb;display:flex;align-items:center;justify-content:space-between;gap:10px}.panel-b{padding:13px}.search{display:grid;grid-template-columns:1fr 130px 130px auto;gap:8px}.input,select,textarea{box-sizing:border-box;border:1px solid #c7d0cc;border-radius:4px;background:#fff;color:#111;font:inherit;font-size:13px}.input,select{min-height:34px;padding:6px 8px}textarea{width:100%;padding:9px;line-height:1.6}.table-wrap{overflow:auto;max-height:74vh}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 9px;border-bottom:1px solid #edf1ef;text-align:left;vertical-align:top}th{position:sticky;top:0;background:#fbfcfc;z-index:1}.company{font-weight:800}.muted{color:#66706b;font-size:12px}.tag{display:inline-flex;padding:2px 7px;border:1px solid #d7dfdb;border-radius:999px;font-size:11px;color:#44504a;background:#f8faf9}.selected{background:#ecfdf5}.detail{display:grid;gap:12px}.kv{display:grid;grid-template-columns:110px 1fr;gap:8px;font-size:13px}.copybox{min-height:150px}.subject{width:100%}.empty{padding:18px;color:#66706b}.ok{background:#ecfdf5;border:1px solid #a7f3d0;padding:9px;border-radius:4px}.err{background:#fff1f2;border:1px solid #fecdd3;padding:9px;border-radius:4px}.frame{width:100%;height:48vh;border:1px solid #c7d0cc;border-radius:4px;background:#fff}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.full{grid-column:1/-1}.field-copy{display:grid;grid-template-columns:90px 1fr auto;gap:8px;align-items:center}.mini{font-size:12px}@media(max-width:960px){.grid,.search,.form-grid{grid-template-columns:1fr}.table-wrap{max-height:none}.frame{height:58vh}.field-copy{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -221,11 +227,12 @@ body{margin:0;background:#f3f5f4;color:#111;font-family:-apple-system,BlinkMacSy
 <?php if($error): ?><div class="err"><?php echo h($error); ?></div><?php endif; ?>
 <div class="grid">
 <section class="panel">
-  <div class="panel-h"><strong>ターゲット顧客リスト</strong><span class="muted"><?php echo h(count($leads)); ?> / <?php echo h(count($all_leads)); ?>件</span></div>
+  <div class="panel-h"><strong>ターゲット顧客リスト</strong><span class="muted">フォームあり <?php echo h($form_ready_count); ?>件 / 表示 <?php echo h(count($leads)); ?>件</span></div>
   <div class="panel-b">
     <form class="search" method="get">
       <input class="input" name="q" value="<?php echo h($query); ?>" placeholder="会社名・住所・業種で検索">
       <select name="status"><option value="">全ステータス</option><?php foreach($statuses as $st): ?><option value="<?php echo h($st); ?>"<?php echo $status_filter === $st ? ' selected' : ''; ?>><?php echo h($st); ?></option><?php endforeach; ?></select>
+      <select name="form"><option value="has_form"<?php echo $form_filter === 'has_form' ? ' selected' : ''; ?>>フォームあり</option><option value=""<?php echo $form_filter === '' ? ' selected' : ''; ?>>すべて</option><option value="no_form"<?php echo $form_filter === 'no_form' ? ' selected' : ''; ?>>フォームなし</option></select>
       <button class="btn primary">検索</button>
     </form>
   </div>
@@ -238,7 +245,7 @@ body{margin:0;background:#f3f5f4;color:#111;font-family:-apple-system,BlinkMacSy
         <td><div class="company"><?php echo h($lead['company_name']); ?></div><div class="muted"><?php echo h($lead['branch']); ?> / <?php echo h($lead['address']); ?></div></td>
         <td><div><?php echo h(isset($lead['phone']) ? $lead['phone'] : ''); ?></div><div class="muted"><?php echo h(isset($lead['website_url']) ? $lead['website_url'] : ''); ?></div></td>
         <td><span class="tag"><?php echo h(isset($lead['status']) ? $lead['status'] : 'new'); ?></span><div class="muted"><?php echo h(isset($lead['last_contacted_at']) ? $lead['last_contacted_at'] : ''); ?></div></td>
-        <td><a class="btn" href="?id=<?php echo urlencode($lead['id']); ?><?php echo $query !== '' ? '&q=' . urlencode($query) : ''; ?><?php echo $status_filter !== '' ? '&status=' . urlencode($status_filter) : ''; ?>">選択</a></td>
+        <td><a class="btn" href="?id=<?php echo urlencode($lead['id']); ?><?php echo $query !== '' ? '&q=' . urlencode($query) : ''; ?><?php echo $status_filter !== '' ? '&status=' . urlencode($status_filter) : ''; ?><?php echo $form_filter !== '' ? '&form=' . urlencode($form_filter) : ''; ?>">選択</a></td>
       </tr>
       <?php endforeach; ?>
       </tbody>
