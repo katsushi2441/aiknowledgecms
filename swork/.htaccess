@@ -1,0 +1,3 @@
+<FilesMatch "^(\.env|leads\.csv)$">
+  Require all denied
+</FilesMatch>
