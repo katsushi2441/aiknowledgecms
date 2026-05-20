@@ -39,7 +39,7 @@ a:hover{text-decoration:underline}
 .aixec-affiliate-name{display:block;font-size:12px;font-weight:900;line-height:1.45;color:#172033}
 .aixec-affiliate-maker,.aixec-affiliate-price{display:block;margin-top:3px;font-size:11px;line-height:1.35;color:#64748b}
 .aixec-affiliate-price{color:#334155;font-weight:800}
-h1{font-size:30px;line-height:1.35;margin:28px 0 18px;color:#132033;font-weight:900}
+h1{font-size:22px;line-height:1.35;margin:14px 0 12px;color:#132033;font-weight:900}
 .seed-form{background:#fff;border:1px solid #dfe5ed;border-radius:6px;padding:14px;margin:16px 0 18px;box-shadow:0 8px 20px rgba(23,32,51,.04)}
 .seed-form-title{font-size:13px;font-weight:900;color:#18824a;margin-bottom:8px}
 .seed-form form{display:grid;grid-template-columns:1fr auto;gap:8px}
@@ -73,7 +73,7 @@ h1{font-size:30px;line-height:1.35;margin:28px 0 18px;color:#132033;font-weight:
   .vwork-promo{align-items:flex-start;flex-direction:column}
   .vwork-promo-links{justify-content:flex-start;width:100%;overflow-x:auto;flex-wrap:nowrap}
   .vwork-promo-links a{flex-shrink:0}
-  h1{font-size:24px}
+  h1{font-size:20px;margin-top:12px}
   .content-shell{display:block}
   .aixec-service-links{margin-top:18px}
   .aixec-affiliate{position:static;margin:18px 0 0}
