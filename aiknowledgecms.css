@@ -19,6 +19,11 @@ a:hover{text-decoration:underline}
 .vwork-promo-links a.primary{background:#22c55e;border-color:#22c55e;color:#052e16}
 .content-shell{display:grid;grid-template-columns:minmax(0,1fr) 286px;gap:18px;align-items:start}
 .content-main{min-width:0}
+.content-side{min-width:0}
+.aixec-service-links{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-bottom:10px}
+.aixec-service-links a{display:flex;align-items:center;justify-content:center;min-height:34px;padding:6px 5px;border-radius:4px;background:#132033;color:#fff;text-decoration:none;font-size:11px;font-weight:900;white-space:nowrap}
+.aixec-service-links a:nth-child(2){background:#1f6f43}
+.aixec-service-links a:nth-child(3){background:#0ea5e9}
 .aixec-affiliate{position:sticky;top:74px;background:#fff;border:1px solid #dfe5ed;border-radius:6px;padding:14px;box-shadow:0 8px 20px rgba(23,32,51,.04)}
 .aixec-affiliate-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
 .aixec-affiliate-head a{display:inline-flex;align-items:center;justify-content:center;min-height:28px;padding:5px 8px;border-radius:4px;border:1px solid #cfe3d7;background:#f2fbf5;color:#1f6f43;font-size:11px;font-weight:900;text-decoration:none;white-space:nowrap}
@@ -70,6 +75,7 @@ h1{font-size:30px;line-height:1.35;margin:28px 0 18px;color:#132033;font-weight:
   .vwork-promo-links a{flex-shrink:0}
   h1{font-size:24px}
   .content-shell{display:block}
+  .aixec-service-links{margin-top:18px}
   .aixec-affiliate{position:static;margin:18px 0 0}
   .seed-form form{grid-template-columns:1fr}
   .scroll{grid-template-columns:1fr}

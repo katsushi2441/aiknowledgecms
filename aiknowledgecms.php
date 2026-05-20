@@ -315,6 +315,11 @@ function cms_render_aixec_affiliate_list($items) {
 function cms_render_aixec_affiliate($clicked_items, $new_items, $reels_url) {
     if ((empty($clicked_items) || !is_array($clicked_items)) && (empty($new_items) || !is_array($new_items))) { return; }
 ?>
+<div class="aixec-service-links" aria-label="AIxECサービスリンク">
+  <a href="https://aixec.exbridge.jp/" target="_blank" rel="noopener">AIxEC</a>
+  <a href="https://aixec.exbridge.jp/sns.php" target="_blank" rel="noopener">AIxSNS</a>
+  <a href="https://aixec.exbridge.jp/aixtube.php" target="_blank" rel="noopener">AIxTube</a>
+</div>
 <aside class="aixec-affiliate" aria-label="AIxEC アフィリエイト広告">
   <div class="aixec-affiliate-head">
     <div>
@@ -1226,7 +1231,9 @@ $can_next  = ($next_date <= $today);
 <?php endif; ?>
 
 </main>
+<div class="content-side">
 <?php cms_render_aixec_affiliate($aixec_affiliate_items, $aixec_new_ai_books, $aixec_reels_url); ?>
+</div>
 </div>
 
 </div><!-- /.app -->
