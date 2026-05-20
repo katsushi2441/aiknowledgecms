@@ -24,6 +24,7 @@ a:hover{text-decoration:underline}
 .aixec-affiliate-head a{display:inline-flex;align-items:center;justify-content:center;min-height:28px;padding:5px 8px;border-radius:4px;border:1px solid #cfe3d7;background:#f2fbf5;color:#1f6f43;font-size:11px;font-weight:900;text-decoration:none;white-space:nowrap}
 .aixec-affiliate-kicker{font-size:11px;color:#18824a;font-weight:900;margin-bottom:2px}
 .aixec-affiliate-title{font-size:15px;color:#132033;font-weight:900;line-height:1.35}
+.aixec-affiliate-section-title{border-top:1px solid #e5eaf0;margin:14px 0 12px;padding-top:12px;font-size:13px;color:#132033;font-weight:900}
 .aixec-affiliate-list{display:grid;gap:12px}
 .aixec-affiliate-item{display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;color:#172033;text-decoration:none}
 .aixec-affiliate-item:hover .aixec-affiliate-name{color:#1f6f43;text-decoration:underline}

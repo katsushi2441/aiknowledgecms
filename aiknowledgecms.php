@@ -178,7 +178,8 @@ function cms_fetch_aixec_books_api($url) {
 
 function cms_fetch_aixec_affiliate_rankings($limit) {
     $limit = max(1, min(10, (int)$limit));
-    $clicked = cms_fetch_aixec_books_api('https://aixec.exbridge.jp/books_ranking_api.php?limit=' . $limit);
+    $fetch_limit = max(20, $limit * 4);
+    $clicked = cms_fetch_aixec_books_api('https://aixec.exbridge.jp/books_ranking_api.php?limit=' . $fetch_limit);
     $items = array();
     $seen = array();
     foreach ($clicked as $item) {
@@ -200,17 +201,68 @@ function cms_fetch_aixec_affiliate_rankings($limit) {
     return $items;
 }
 
-function cms_render_aixec_affiliate($items) {
+function cms_fetch_new_ai_books($limit) {
+    $limit = max(1, min(10, (int)$limit));
+    $url = 'https://aixec.exbridge.jp/api.php?' . http_build_query(array(
+        'path' => 'books/ranking',
+        'genre_id' => '001005',
+        'keyword' => 'AI',
+        'hits' => $limit,
+        'sort' => '-releaseDate',
+    ));
+    $json = false;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: application/json'));
+        curl_setopt($ch, CURLOPT_USERAGENT, 'AIKnowledgeCMS/1.0');
+        $json = curl_exec($ch);
+        curl_close($ch);
+    }
+    if (!$json) {
+        $ctx = stream_context_create(array(
+            'http' => array(
+                'method' => 'GET',
+                'timeout' => 8,
+                'header' => "User-Agent: AIKnowledgeCMS/1.0\r\nAccept: application/json\r\n",
+                'ignore_errors' => true
+            )
+        ));
+        $json = @file_get_contents($url, false, $ctx);
+    }
+    if (!$json) { return array(); }
+    $data = json_decode($json, true);
+    $books = isset($data['result']['items']) && is_array($data['result']['items']) ? $data['result']['items'] : array();
+    $items = array();
+    foreach ($books as $i => $book) {
+        $title = isset($book['title']) ? $book['title'] : '';
+        if ($title === '') { continue; }
+        $params = array('to' => 'rakuten', 'kw' => $title);
+        if (!empty($book['isbn'])) { $params['jan'] = preg_replace('/\D/', '', $book['isbn']); }
+        $direct_url = !empty($book['affiliate_url']) ? $book['affiliate_url'] : (!empty($book['item_url']) ? $book['item_url'] : '');
+        if ($direct_url !== '') { $params['url'] = $direct_url; }
+        $items[] = array(
+            'rank' => $i + 1,
+            'clicks' => null,
+            'title' => $title,
+            'maker' => isset($book['publisher_name']) ? $book['publisher_name'] : (isset($book['author']) ? $book['author'] : ''),
+            'isbn' => isset($book['isbn']) ? $book['isbn'] : '',
+            'price' => isset($book['item_price']) ? (int)$book['item_price'] : 0,
+            'sales_date' => isset($book['sales_date']) ? $book['sales_date'] : '',
+            'image_url' => isset($book['image_url']) ? $book['image_url'] : '',
+            'affiliate_url' => 'https://aixec.exbridge.jp/go.php?' . http_build_query($params),
+            'product_url' => isset($book['item_url']) ? $book['item_url'] : '',
+        );
+        if (count($items) >= $limit) { break; }
+    }
+    return $items;
+}
+
+function cms_render_aixec_affiliate_list($items) {
     if (empty($items) || !is_array($items)) { return; }
 ?>
-<aside class="aixec-affiliate" aria-label="AIxEC アフィリエイト広告">
-  <div class="aixec-affiliate-head">
-    <div>
-      <div class="aixec-affiliate-kicker">AIxEC Affiliate</div>
-      <div class="aixec-affiliate-title">クリックが多い商品</div>
-    </div>
-    <a href="https://aixec.exbridge.jp/books_ranking.php" target="_blank" rel="noopener">一覧</a>
-  </div>
   <div class="aixec-affiliate-list">
     <?php foreach ($items as $i => $item):
         $title = isset($item['title']) ? $item['title'] : '';
@@ -220,6 +272,7 @@ function cms_render_aixec_affiliate($items) {
         $price = isset($item['price']) ? (int)$item['price'] : 0;
         $rank  = isset($item['rank']) ? (int)$item['rank'] : ($i + 1);
         $clicks = isset($item['clicks']) ? $item['clicks'] : null;
+        $sales_date = isset($item['sales_date']) ? $item['sales_date'] : '';
     ?>
     <a class="aixec-affiliate-item" href="<?php echo h($url); ?>" target="_blank" rel="nofollow sponsored noopener">
       <?php if ($image): ?>
@@ -231,11 +284,31 @@ function cms_render_aixec_affiliate($items) {
         <span class="aixec-affiliate-rank">#<?php echo $rank; ?><?php if ($clicks !== null): ?> / <?php echo (int)$clicks; ?> clicks<?php endif; ?></span>
         <span class="aixec-affiliate-name"><?php echo h($title); ?></span>
         <?php if ($maker): ?><span class="aixec-affiliate-maker"><?php echo h($maker); ?></span><?php endif; ?>
+        <?php if ($sales_date): ?><span class="aixec-affiliate-maker">発売: <?php echo h($sales_date); ?></span><?php endif; ?>
         <?php if ($price > 0): ?><span class="aixec-affiliate-price"><?php echo number_format($price); ?>円</span><?php endif; ?>
       </span>
     </a>
     <?php endforeach; ?>
   </div>
+<?php
+}
+
+function cms_render_aixec_affiliate($clicked_items, $new_items) {
+    if ((empty($clicked_items) || !is_array($clicked_items)) && (empty($new_items) || !is_array($new_items))) { return; }
+?>
+<aside class="aixec-affiliate" aria-label="AIxEC アフィリエイト広告">
+  <div class="aixec-affiliate-head">
+    <div>
+      <div class="aixec-affiliate-kicker">AIxEC Affiliate</div>
+      <div class="aixec-affiliate-title">クリックが多い商品</div>
+    </div>
+    <a href="https://aixec.exbridge.jp/books_ranking.php" target="_blank" rel="noopener">一覧</a>
+  </div>
+  <?php cms_render_aixec_affiliate_list($clicked_items); ?>
+  <?php if (!empty($new_items)): ?>
+  <div class="aixec-affiliate-section-title">新着AI書籍</div>
+  <?php cms_render_aixec_affiliate_list($new_items); ?>
+  <?php endif; ?>
 </aside>
 <?php
 }
@@ -244,7 +317,8 @@ function cms_render_aixec_affiliate($items) {
    adminモード判定（セッションベース）
 ========================================================= */
 $is_admin = ($cms_username === 'xb_bittensor');
-$aixec_affiliate_items = cms_fetch_aixec_affiliate_rankings(8);
+$aixec_affiliate_items = cms_fetch_aixec_affiliate_rankings(6);
+$aixec_new_ai_books = cms_fetch_new_ai_books(6);
 
 /* =========================================================
    API : JSON GENERATION (for worker)
@@ -1132,7 +1206,7 @@ $can_next  = ($next_date <= $today);
 <?php endif; ?>
 
 </main>
-<?php cms_render_aixec_affiliate($aixec_affiliate_items); ?>
+<?php cms_render_aixec_affiliate($aixec_affiliate_items, $aixec_new_ai_books); ?>
 </div>
 
 </div><!-- /.app -->
