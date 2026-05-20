@@ -45,10 +45,10 @@ if(isset($_GET["dashboard"])){
     }
     $range_start_ts = null;
     if($range !== "all"){
-        $range_start_ts = strtotime("-" . ($range_days[$range] - 1) . " days 00:00:00");
+        $range_start_ts = ($range === "1d") ? strtotime("-24 hours") : strtotime("-" . ($range_days[$range] - 1) . " days 00:00:00");
     }
     $range_labels = array(
-        "1d" => "直近1日",
+        "1d" => "直近24時間",
         "7d" => "直近1週間",
         "30d" => "直近30日",
         "90d" => "直近3か月",
