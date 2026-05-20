@@ -17,6 +17,22 @@ a:hover{text-decoration:underline}
 .vwork-promo-links{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;flex-shrink:0}
 .vwork-promo-links a{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:7px 11px;border-radius:4px;text-decoration:none;font-size:12px;font-weight:800;border:1px solid rgba(255,255,255,.24);color:#fff;background:rgba(255,255,255,.08);white-space:nowrap}
 .vwork-promo-links a.primary{background:#22c55e;border-color:#22c55e;color:#052e16}
+.content-shell{display:grid;grid-template-columns:minmax(0,1fr) 286px;gap:18px;align-items:start}
+.content-main{min-width:0}
+.aixec-affiliate{position:sticky;top:74px;background:#fff;border:1px solid #dfe5ed;border-radius:6px;padding:14px;box-shadow:0 8px 20px rgba(23,32,51,.04)}
+.aixec-affiliate-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:12px}
+.aixec-affiliate-head a{display:inline-flex;align-items:center;justify-content:center;min-height:28px;padding:5px 8px;border-radius:4px;border:1px solid #cfe3d7;background:#f2fbf5;color:#1f6f43;font-size:11px;font-weight:900;text-decoration:none;white-space:nowrap}
+.aixec-affiliate-kicker{font-size:11px;color:#18824a;font-weight:900;margin-bottom:2px}
+.aixec-affiliate-title{font-size:15px;color:#132033;font-weight:900;line-height:1.35}
+.aixec-affiliate-list{display:grid;gap:12px}
+.aixec-affiliate-item{display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;color:#172033;text-decoration:none}
+.aixec-affiliate-item:hover .aixec-affiliate-name{color:#1f6f43;text-decoration:underline}
+.aixec-affiliate-item img,.aixec-affiliate-noimage{display:block;width:54px;height:76px;object-fit:cover;border:1px solid #e5eaf0;border-radius:4px;background:#f8fafc}
+.aixec-affiliate-body{display:block;min-width:0}
+.aixec-affiliate-rank{display:block;font-size:11px;color:#18824a;font-weight:900;margin-bottom:3px}
+.aixec-affiliate-name{display:block;font-size:12px;font-weight:900;line-height:1.45;color:#172033}
+.aixec-affiliate-maker,.aixec-affiliate-price{display:block;margin-top:3px;font-size:11px;line-height:1.35;color:#64748b}
+.aixec-affiliate-price{color:#334155;font-weight:800}
 h1{font-size:30px;line-height:1.35;margin:28px 0 18px;color:#132033;font-weight:900}
 .seed-form{background:#fff;border:1px solid #dfe5ed;border-radius:6px;padding:14px;margin:16px 0 18px;box-shadow:0 8px 20px rgba(23,32,51,.04)}
 .seed-form-title{font-size:13px;font-weight:900;color:#18824a;margin-bottom:8px}
@@ -52,6 +68,8 @@ h1{font-size:30px;line-height:1.35;margin:28px 0 18px;color:#132033;font-weight:
   .vwork-promo-links{justify-content:flex-start;width:100%;overflow-x:auto;flex-wrap:nowrap}
   .vwork-promo-links a{flex-shrink:0}
   h1{font-size:24px}
+  .content-shell{display:block}
+  .aixec-affiliate{position:static;margin:18px 0 0}
   .seed-form form{grid-template-columns:1fr}
   .scroll{grid-template-columns:1fr}
 }

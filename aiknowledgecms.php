@@ -147,10 +147,104 @@ if (isset($_GET['code']) && isset($_GET['state']) && isset($_SESSION['cms_oauth_
 $cms_logged_in = isset($_SESSION['cms_access_token']) && $_SESSION['cms_access_token'] !== '';
 $cms_username  = isset($_SESSION['cms_username']) ? $_SESSION['cms_username'] : '';
 
+function cms_fetch_aixec_books_api($url) {
+    $json = false;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array('Accept: application/json'));
+        curl_setopt($ch, CURLOPT_USERAGENT, 'AIKnowledgeCMS/1.0');
+        $json = curl_exec($ch);
+        curl_close($ch);
+    }
+    if (!$json) {
+        $ctx = stream_context_create(array(
+            'http' => array(
+                'method' => 'GET',
+                'timeout' => 8,
+                'header' => "User-Agent: AIKnowledgeCMS/1.0\r\nAccept: application/json\r\n",
+                'ignore_errors' => true
+            )
+        ));
+        $json = @file_get_contents($url, false, $ctx);
+    }
+    if (!$json) { return array(); }
+    $data = json_decode($json, true);
+    if (!is_array($data) || empty($data['items']) || !is_array($data['items'])) { return array(); }
+    return $data['items'];
+}
+
+function cms_fetch_aixec_affiliate_rankings($limit) {
+    $limit = max(1, min(10, (int)$limit));
+    $clicked = cms_fetch_aixec_books_api('https://aixec.exbridge.jp/books_ranking_api.php?limit=' . $limit);
+    $items = array();
+    $seen = array();
+    foreach ($clicked as $item) {
+        if (!isset($item['clicks']) || $item['clicks'] === null) { continue; }
+        $key = !empty($item['isbn']) ? preg_replace('/\D/', '', $item['isbn']) : (isset($item['title']) ? $item['title'] : '');
+        if ($key === '' || isset($seen[$key])) { continue; }
+        $seen[$key] = true;
+        $items[] = $item;
+        if (count($items) >= $limit) { return $items; }
+    }
+    $fallback = cms_fetch_aixec_books_api('https://aixec.exbridge.jp/books_ranking_api.php?tab=ai&limit=' . $limit);
+    foreach ($fallback as $item) {
+        $key = !empty($item['isbn']) ? preg_replace('/\D/', '', $item['isbn']) : (isset($item['title']) ? $item['title'] : '');
+        if ($key === '' || isset($seen[$key])) { continue; }
+        $seen[$key] = true;
+        $items[] = $item;
+        if (count($items) >= $limit) { break; }
+    }
+    return $items;
+}
+
+function cms_render_aixec_affiliate($items) {
+    if (empty($items) || !is_array($items)) { return; }
+?>
+<aside class="aixec-affiliate" aria-label="AIxEC アフィリエイト広告">
+  <div class="aixec-affiliate-head">
+    <div>
+      <div class="aixec-affiliate-kicker">AIxEC Affiliate</div>
+      <div class="aixec-affiliate-title">クリックが多い商品</div>
+    </div>
+    <a href="https://aixec.exbridge.jp/books_ranking.php" target="_blank" rel="noopener">一覧</a>
+  </div>
+  <div class="aixec-affiliate-list">
+    <?php foreach ($items as $i => $item):
+        $title = isset($item['title']) ? $item['title'] : '';
+        $url   = !empty($item['affiliate_url']) ? $item['affiliate_url'] : (isset($item['product_url']) ? $item['product_url'] : '#');
+        $image = isset($item['image_url']) ? $item['image_url'] : '';
+        $maker = isset($item['maker']) ? $item['maker'] : '';
+        $price = isset($item['price']) ? (int)$item['price'] : 0;
+        $rank  = isset($item['rank']) ? (int)$item['rank'] : ($i + 1);
+        $clicks = isset($item['clicks']) ? $item['clicks'] : null;
+    ?>
+    <a class="aixec-affiliate-item" href="<?php echo h($url); ?>" target="_blank" rel="nofollow sponsored noopener">
+      <?php if ($image): ?>
+      <img src="<?php echo h($image); ?>" alt="<?php echo h($title); ?>" loading="lazy">
+      <?php else: ?>
+      <span class="aixec-affiliate-noimage"></span>
+      <?php endif; ?>
+      <span class="aixec-affiliate-body">
+        <span class="aixec-affiliate-rank">#<?php echo $rank; ?><?php if ($clicks !== null): ?> / <?php echo (int)$clicks; ?> clicks<?php endif; ?></span>
+        <span class="aixec-affiliate-name"><?php echo h($title); ?></span>
+        <?php if ($maker): ?><span class="aixec-affiliate-maker"><?php echo h($maker); ?></span><?php endif; ?>
+        <?php if ($price > 0): ?><span class="aixec-affiliate-price"><?php echo number_format($price); ?>円</span><?php endif; ?>
+      </span>
+    </a>
+    <?php endforeach; ?>
+  </div>
+</aside>
+<?php
+}
+
 /* =========================================================
    adminモード判定（セッションベース）
 ========================================================= */
 $is_admin = ($cms_username === 'xb_bittensor');
+$aixec_affiliate_items = cms_fetch_aixec_affiliate_rankings(8);
 
 /* =========================================================
    API : JSON GENERATION (for worker)
@@ -946,6 +1040,9 @@ if ($view_keyword !== "") {
   </div>
 </section>
 
+<div class="content-shell">
+<main class="content-main">
+
 <h1>AI Knowledge CMS｜AIが毎日ニュースを分析・蓄積する知識メディア</h1>
 
 <div id="thinking-overlay">
@@ -1033,6 +1130,10 @@ $can_next  = ($next_date <= $today);
 <?php if ($view_keyword === ""): ?>
 <div id="loading-indicator">◎ loading...</div>
 <?php endif; ?>
+
+</main>
+<?php cms_render_aixec_affiliate($aixec_affiliate_items); ?>
+</div>
 
 </div><!-- /.app -->
 
