@@ -260,6 +260,25 @@ function cms_fetch_new_ai_books($limit) {
     return $items;
 }
 
+function cms_aixec_reels_url($clicked_items, $new_items) {
+    $ids = array();
+    $isbns = array();
+    foreach (array_merge(is_array($clicked_items) ? $clicked_items : array(), is_array($new_items) ? $new_items : array()) as $item) {
+        if (!empty($item['id'])) {
+            $id = (int)$item['id'];
+            if ($id > 0 && !in_array($id, $ids, true)) { $ids[] = $id; }
+        }
+        if (!empty($item['isbn'])) {
+            $isbn = preg_replace('/\D/', '', (string)$item['isbn']);
+            if ($isbn !== '' && !in_array($isbn, $isbns, true)) { $isbns[] = $isbn; }
+        }
+    }
+    $params = array('limit' => 12);
+    if ($ids) { $params['ids'] = implode(',', $ids); }
+    if ($isbns) { $params['isbns'] = implode(',', $isbns); }
+    return 'https://aixec.exbridge.jp/reels.php?' . http_build_query($params);
+}
+
 function cms_render_aixec_affiliate_list($items) {
     if (empty($items) || !is_array($items)) { return; }
 ?>
@@ -293,7 +312,7 @@ function cms_render_aixec_affiliate_list($items) {
 <?php
 }
 
-function cms_render_aixec_affiliate($clicked_items, $new_items) {
+function cms_render_aixec_affiliate($clicked_items, $new_items, $reels_url) {
     if ((empty($clicked_items) || !is_array($clicked_items)) && (empty($new_items) || !is_array($new_items))) { return; }
 ?>
 <aside class="aixec-affiliate" aria-label="AIxEC アフィリエイト広告">
@@ -302,7 +321,7 @@ function cms_render_aixec_affiliate($clicked_items, $new_items) {
       <div class="aixec-affiliate-kicker">AIxEC Affiliate</div>
       <div class="aixec-affiliate-title">クリックが多い商品</div>
     </div>
-    <a href="https://aixec.exbridge.jp/books_ranking.php" target="_blank" rel="noopener">一覧</a>
+    <a href="<?php echo h($reels_url); ?>" target="_blank" rel="noopener">リール動画</a>
   </div>
   <?php cms_render_aixec_affiliate_list($clicked_items); ?>
   <?php if (!empty($new_items)): ?>
@@ -319,6 +338,7 @@ function cms_render_aixec_affiliate($clicked_items, $new_items) {
 $is_admin = ($cms_username === 'xb_bittensor');
 $aixec_affiliate_items = cms_fetch_aixec_affiliate_rankings(6);
 $aixec_new_ai_books = cms_fetch_new_ai_books(6);
+$aixec_reels_url = cms_aixec_reels_url($aixec_affiliate_items, $aixec_new_ai_books);
 
 /* =========================================================
    API : JSON GENERATION (for worker)
@@ -1206,7 +1226,7 @@ $can_next  = ($next_date <= $today);
 <?php endif; ?>
 
 </main>
-<?php cms_render_aixec_affiliate($aixec_affiliate_items, $aixec_new_ai_books); ?>
+<?php cms_render_aixec_affiliate($aixec_affiliate_items, $aixec_new_ai_books, $aixec_reels_url); ?>
 </div>
 
 </div><!-- /.app -->
