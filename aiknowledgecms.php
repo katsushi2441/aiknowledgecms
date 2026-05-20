@@ -9,6 +9,11 @@ define("DATA_DIR", __DIR__ . "/data");
 define("KEYWORD_JSON", __DIR__ . "/keyword.json");
 define("VIEWS_JSON",   __DIR__ . "/views.json");
 define("NEWS_LIMIT", 5);
+define("TOP_KEYWORD_LIMIT", 15);
+define("DEFAULT_RESULT_LIMIT", 15);
+define("DEFAULT_DAY_LIMIT", 5);
+define("DETAIL_DAY_LIMIT", 10);
+define("NEWS_DISPLAY_LIMIT", 3);
 define("AIKNOWLEDGE_TOKEN", "秘密の文字列");
 
 /* 日付(Y-m-d)から ./data/yyyymm/ ディレクトリパスを返す（なければ作成） */
@@ -835,6 +840,7 @@ if (isset($_GET["kw"])) { $view_keyword = trim($_GET["kw"]); }
 
 function build_results_by_date($keywords, $base_date, $view_keyword = "") {
     $results = array();
+    $day_limit = $view_keyword !== "" ? DETAIL_DAY_LIMIT : DEFAULT_DAY_LIMIT;
     foreach ($keywords as $kw) {
         if ($view_keyword !== "" && $kw !== $view_keyword) { continue; }
         $_ym1 = date("Ym", strtotime($base_date));
@@ -842,7 +848,7 @@ function build_results_by_date($keywords, $base_date, $view_keyword = "") {
         if (!file_exists($today_file)) { $today_file = DATA_DIR . "/" . $base_date . "_" . $kw . ".json"; }
         if (!file_exists($today_file)) { continue; }
         $results[$kw] = array();
-        for ($i = 0; $i < 10; $i++) {
+        for ($i = 0; $i < $day_limit; $i++) {
             $ts        = strtotime("-".$i." day", strtotime($base_date));
             $d         = date("Y-m-d", $ts);
             $_ym2 = date("Ym", strtotime($d));
@@ -862,6 +868,7 @@ if ($view_keyword === "") {
         $views_b = isset($views_data[$b]) ? $views_data[$b] : 0;
         return $views_b - $views_a;
     });
+    $results = array_slice($results, 0, DEFAULT_RESULT_LIMIT, true);
 }
 
 /* ===================== SEO 用変数 ===================== */
@@ -927,6 +934,18 @@ if ($view_keyword !== "") {
   </div>
 </div>
 
+<section class="vwork-promo" aria-label="バイブコーディング導線">
+  <div class="vwork-promo-copy">
+    <div class="vwork-promo-kicker">Built with Vibe Coding</div>
+    <div class="vwork-promo-title">AIKnowledgeCMSは、バイブコーディングで育てている知識メディアです。</div>
+  </div>
+  <div class="vwork-promo-links">
+    <a class="primary" href="https://exbridge.jp/seminar.html" target="_blank" rel="noopener">バイブコーディングセミナー</a>
+    <a href="https://exbridge.jp/vwork.html" target="_blank" rel="noopener">VWork</a>
+    <a href="https://katsushi2441.github.io/vwork/" target="_blank" rel="noopener">VWorkブログ</a>
+  </div>
+</section>
+
 <h1>AI Knowledge CMS｜AIが毎日ニュースを分析・蓄積する知識メディア</h1>
 
 <div id="thinking-overlay">
@@ -960,7 +979,7 @@ usort($today_keywords, function($a, $b) use ($views_data) {
     $views_b = isset($views_data[$b]) ? $views_data[$b] : 0;
     return $views_b - $views_a;
 });
-$today_keywords = array_slice($today_keywords, 0, 30);
+$today_keywords = array_slice($today_keywords, 0, TOP_KEYWORD_LIMIT);
 foreach ($today_keywords as $kw):
 ?>
 <a href="#keyword-<?php echo h(urlencode($kw)); ?>"><?php echo h($kw); ?></a>
@@ -998,7 +1017,7 @@ $can_next  = ($next_date <= $today);
   <?php $daily = json_decode(file_get_contents($file), true); ?>
   <div class="card">
     <textarea readonly rows="5"><?php echo h(isset($daily["analysis"]) ? $daily["analysis"] : ""); ?></textarea>
-    <?php foreach ($daily["news"] as $n): ?>
+    <?php foreach (array_slice(isset($daily["news"]) && is_array($daily["news"]) ? $daily["news"] : array(), 0, NEWS_DISPLAY_LIMIT) as $n): ?>
     <hr>
     <div class="title"><?php echo h($n["title"]); ?></div>
     <div class="muted"><?php echo h($n["pubDate"]); ?></div>
