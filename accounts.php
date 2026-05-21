@@ -1,7 +1,7 @@
 <?php
 $data_dir     = __DIR__ . '/data/';
 $ollama_url   = 'https://exbridge.ddns.net/api/generate';
-$ollama_model = 'gemma3:12b';
+$ollama_model = 'gemma4:e4b';
 
 if (!is_dir($data_dir)) { mkdir($data_dir, 0755, true); }
 
@@ -265,7 +265,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'stream') {
 
     $data_dir     = __DIR__ . '/data/';
     $ollama_url   = 'https://exbridge.ddns.net/api/generate';
-    $ollama_model = 'gemma3:12b';
+    $ollama_model = 'gemma4:e4b';
     $source_urls = array(
         'https://shift-ai.co.jp/blog/16883/',
         'https://www.salesforce.com/jp/blog/jp-ai-influencers/',
@@ -375,7 +375,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'stream_zenn') {
 
     $data_dir     = __DIR__ . '/data/';
     $ollama_url   = 'https://exbridge.ddns.net/api/generate';
-    $ollama_model = 'gemma3:12b';
+    $ollama_model = 'gemma4:e4b';
     $zenn_topics  = array('ai', 'llm', 'machinelearning', 'python', 'chatgpt');
     $zenn_pages   = 3;
 

@@ -14,7 +14,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'analyze') {
     }
     $full_prompt = $system ? $system . "\n\n" . $prompt : $prompt;
     $payload = json_encode(array(
-        'model'  => 'gemma3:12b',
+        'model'  => 'gemma4:e4b',
         'prompt' => $full_prompt,
         'stream' => false,
     ));

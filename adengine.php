@@ -241,7 +241,7 @@ if (isset($_GET['action']) && $_GET['action'] === 'gen_pr') {
     }
     $ollama_url = 'https://exbridge.ddns.net/api/generate';
     $ollama_req = json_encode(array(
-        'model'  => 'gemma3:12b',
+        'model'  => 'gemma4:e4b',
         'prompt' => $prompt,
         'stream' => false,
     ), JSON_UNESCAPED_UNICODE);

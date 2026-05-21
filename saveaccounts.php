@@ -7,7 +7,7 @@
 
 $data_dir     = __DIR__ . '/data/';
 $ollama_url   = 'https://exbridge.ddns.net/api/generate';
-$ollama_model = 'gemma3:12b';
+$ollama_model = 'gemma4:e4b';
 define('SAVE_API_TOKEN', 'AIKNOWLEDGE_SAVE_TOKEN_HERE');  // zenn_collect.pyと合わせる
 
 header('Content-Type: application/json; charset=UTF-8');
