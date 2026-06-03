@@ -1097,6 +1097,8 @@ if ($view_keyword !== "") {
   gtag('js', new Date());
   gtag('config', 'G-BP0650KDFR');
 </script>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2528616930208188"
+     crossorigin="anonymous"></script>
 </head>
 <body>
 <div class="app">
