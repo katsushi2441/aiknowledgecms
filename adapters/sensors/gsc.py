@@ -3,14 +3,17 @@
 集客ループの心臓部: 「表示回数はあるがクリックが少ないクエリ」を
 opportunity として research テーブルに流し込み、CREATE のテーマ選定に使う。
 
-認証: サービスアカウントJSON (loopfile: gsc.credentials_file)。
-外部ライブラリ不要 — JWTを自前で署名してアクセストークンを取得する。
-credentials未設定なら観測をスキップする(エラーにしない)。
+認証は2方式 (loopfile: gsc.auth):
+  - gcloud (既定): Application Default Credentials。
+    ADCファイルの quota_project_id を X-Goog-User-Project として送る(必須)。
+  - service_account: サービスアカウントJSON (gsc.credentials_file) をJWT自前署名。
+どちらも使えない場合は観測をスキップする(エラーにしない)。
 """
 from __future__ import annotations
 
 import base64
 import json
+import subprocess
 import time
 import urllib.parse
 import urllib.request
@@ -21,19 +24,17 @@ from core import state
 NAME = "gsc"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 SCOPE = "https://www.googleapis.com/auth/webmasters.readonly"
+ADC_PATH = Path.home() / ".config/gcloud/application_default_credentials.json"
 
 
 def _b64url(data: bytes) -> bytes:
     return base64.urlsafe_b64encode(data).rstrip(b"=")
 
 
-def _access_token(creds: dict) -> str:
+def _sa_access_token(creds: dict) -> str:
     """サービスアカウントJWTでOAuthトークンを取得(RS256署名)。"""
-    try:
-        from cryptography.hazmat.primitives import hashes, serialization
-        from cryptography.hazmat.primitives.asymmetric import padding
-    except ImportError as e:
-        raise RuntimeError("python3-cryptography が必要です (apt install python3-cryptography)") from e
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import padding
 
     now = int(time.time())
     header = _b64url(json.dumps({"alg": "RS256", "typ": "JWT"}).encode())
@@ -59,18 +60,41 @@ def _access_token(creds: dict) -> str:
         return json.loads(r.read())["access_token"]
 
 
-def sense(cfg: dict, conn, tick_id: int) -> dict:
-    gc = cfg.get("gsc", {})
+def _auth(gc: dict) -> tuple[str, str] | None:
+    """(token, quota_project) を返す。認証手段が無ければ None。"""
+    mode = gc.get("auth", "gcloud")
+    if mode == "gcloud":
+        proc = subprocess.run(
+            ["gcloud", "auth", "application-default", "print-access-token"],
+            capture_output=True, text=True)
+        token = proc.stdout.strip()
+        if proc.returncode != 0 or not token:
+            return None
+        qp = gc.get("quota_project", "")
+        if not qp and ADC_PATH.exists():
+            qp = json.loads(ADC_PATH.read_text()).get("quota_project_id", "")
+        return token, qp
     creds_path = gc.get("credentials_file", "")
     if not creds_path or not Path(creds_path).exists():
+        return None
+    return _sa_access_token(json.loads(Path(creds_path).read_text())), ""
+
+
+def sense(cfg: dict, conn, tick_id: int) -> dict:
+    gc = cfg.get("gsc", {})
+    auth = None
+    try:
+        auth = _auth(gc)
+    except Exception as e:
         state.record(conn, tick_id, NAME, "gsc_skipped", 1,
-                     {"reason": "credentials_file未設定"})
+                     {"reason": f"auth error: {str(e)[:200]}"})
         return {"skipped": True}
+    if auth is None:
+        state.record(conn, tick_id, NAME, "gsc_skipped", 1, {"reason": "認証手段なし"})
+        return {"skipped": True}
+    token, quota_project = auth
 
-    creds = json.loads(Path(creds_path).read_text())
-    token = _access_token(creds)
     site = gc.get("property", cfg["site"].rstrip("/") + "/")
-
     end = time.strftime("%Y-%m-%d", time.localtime(time.time() - 2 * 86400))
     start = time.strftime("%Y-%m-%d", time.localtime(time.time() - 30 * 86400))
     body = json.dumps({
@@ -79,8 +103,10 @@ def sense(cfg: dict, conn, tick_id: int) -> dict:
     }).encode()
     url = ("https://www.googleapis.com/webmasters/v3/sites/"
            + urllib.parse.quote(site, safe="") + "/searchAnalytics/query")
-    req = urllib.request.Request(url, data=body, headers={
-        "Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    if quota_project:
+        headers["X-Goog-User-Project"] = quota_project
+    req = urllib.request.Request(url, data=body, headers=headers)
     with urllib.request.urlopen(req, timeout=60) as r:
         rows = json.loads(r.read()).get("rows", [])
 

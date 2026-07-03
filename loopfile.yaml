@@ -19,7 +19,7 @@ sensors: [http_health, simpletrack, gsc]
 #   1. GCPでサービスアカウント作成 → JSONキーを下記パスに保存
 #   2. Search Consoleの「設定→ユーザーと権限」でそのメールを閲覧者として追加
 gsc:
-  credentials_file: /home/kojima/work/aiknowledgecms/data/gsc-credentials.json
+  auth: gcloud   # kgrowthと同じADC認証(quota projectはADCファイルから自動取得)
   property: https://aiknowledgecms.exbridge.jp/
   opportunity_min_impressions: 20
 
