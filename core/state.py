@@ -32,6 +32,29 @@ CREATE TABLE IF NOT EXISTS observations (
 );
 CREATE INDEX IF NOT EXISTS idx_obs_tick ON observations(tick_id);
 CREATE INDEX IF NOT EXISTS idx_obs_key ON observations(key, id);
+CREATE TABLE IF NOT EXISTS research (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  tick_id INTEGER NOT NULL,
+  source TEXT NOT NULL,
+  title TEXT NOT NULL,
+  url TEXT NOT NULL UNIQUE,
+  summary TEXT,
+  score REAL NOT NULL DEFAULT 0,
+  used INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS content (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  status TEXT NOT NULL,               -- draft / published / rejected
+  body_md TEXT,
+  sources TEXT,                       -- json: 参照したresearch URL群
+  gate_result TEXT,                   -- json: ゲート判定の詳細
+  created_tick INTEGER NOT NULL,
+  published_at TEXT,
+  created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS issues (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   fingerprint TEXT NOT NULL UNIQUE,

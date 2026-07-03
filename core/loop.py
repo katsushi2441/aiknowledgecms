@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core import loopfile, state
 from adapters.sensors import http_health, simpletrack
+from adapters.collectors import rss
 
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS = ROOT / "reports"
@@ -86,8 +87,70 @@ def triage(cfg: dict, conn, tick_id: int, sensed: dict) -> dict:
     return {"opened": opened, "resolved": resolved}
 
 
+# ---------------------------------------------------------------- create
+def maybe_create(cfg: dict, conn, tick_id: int, dry_run: bool,
+                 force: bool = False) -> dict:
+    """CREATE→ゲート→DISTRIBUTE。日次予算内で1本だけ試行する。
+
+    dry-runではLLMを呼ばない(コストも副作用)。
+    """
+    result = {"attempted": False, "published": None, "rejected": None, "skipped": ""}
+    cc = cfg.get("create")
+    if cc is None:
+        result["skipped"] = "create未設定"
+        return result
+    if dry_run and not force:
+        result["skipped"] = "dry-run"
+        return result
+
+    today = state.now()[:10]
+    published_today = conn.execute(
+        "SELECT COUNT(*) FROM content WHERE status='published' AND published_at LIKE ?",
+        (today + "%",)).fetchone()[0]
+    attempts_today = conn.execute(
+        "SELECT COUNT(*) FROM content WHERE created_at LIKE ?", (today + "%",)).fetchone()[0]
+    if not force:
+        if published_today >= int(cc.get("articles_per_day", 1)):
+            result["skipped"] = f"日次予算達成(published={published_today})"
+            return result
+        if attempts_today >= int(cc.get("max_attempts_per_day", 2)):
+            result["skipped"] = f"試行上限(attempts={attempts_today})"
+            return result
+
+    from adapters.generators import agent_article
+    from gates import verify_article
+
+    result["attempted"] = True
+    draft = agent_article.generate(cfg, conn, tick_id)
+    if draft is None:
+        result["skipped"] = "素材なし/生成失敗"
+        return result
+
+    gate = verify_article.run(cfg, conn, draft)
+    if not gate["passed"]:
+        reasons = gate["problems"] or [
+            (gate.get("verifier") or {}).get("reason", "verifier FAIL")]
+        result["rejected"] = {"title": draft["title"], "reasons": reasons}
+        state.record(conn, tick_id, "create", "article_rejected", 1,
+                     {"slug": draft["slug"], "reasons": reasons})
+        return result
+
+    from adapters.publishers import articles_ftp
+    from adapters.announcers import aixsns
+    url = articles_ftp.publish(cfg, conn, draft, gate)
+    announced = False
+    try:
+        announced = aixsns.announce(cfg, draft["title"], url)
+    except Exception:
+        state.record(conn, tick_id, "create", "announce_error", 1, {})
+    state.record(conn, tick_id, "create", "article_published", 1,
+                 {"slug": draft["slug"], "url": url, "announced": announced})
+    result["published"] = {"title": draft["title"], "url": url, "announced": announced}
+    return result
+
+
 # ---------------------------------------------------------------- report
-def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run) -> str:
+def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run, researched=None, created=None) -> str:
     lines = [f"# Loop Report — tick {tick_id}", ""]
     lines.append(f"- 実行時刻: {state.now()}")
     lines.append(f"- モード: {'dry-run' if dry_run else 'live'}")
@@ -110,6 +173,24 @@ def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run) -> str:
         lines.append(f"- {mark} {p['page']} — HTTP {p['status']} / {p['ms']}ms"
                      + (f" / {p['error']}" if p["error"] else ""))
     lines.append("")
+    if researched is not None:
+        lines.append("## RESEARCH")
+        lines.append(f"- 新規素材: {researched.get('added', 0)}件 (取得 {researched.get('fetched', 0)}件)")
+        lines.append("")
+    if created is not None:
+        lines.append("## CREATE / DISTRIBUTE")
+        if created.get("published"):
+            pub = created["published"]
+            lines.append(f"- ✅ 記事を公開: [{pub['title']}]({pub['url']})"
+                         + (" (AIxSNS告知済み)" if pub.get("announced") else ""))
+        elif created.get("rejected"):
+            rej = created["rejected"]
+            lines.append(f"- 🛑 ゲート不合格で非公開: {rej['title']}")
+            for r in rej["reasons"][:5]:
+                lines.append(f"  - {r}")
+        else:
+            lines.append(f"- スキップ: {created.get('skipped', '-')}")
+        lines.append("")
     lines.append("## TRIAGE")
     lines.append(f"- 新規/再発 issue: {len(triaged['opened'])}")
     for o in triaged["opened"]:
@@ -243,7 +324,7 @@ def escalate(cfg: dict, opened: list[dict]) -> bool:
 
 
 # ---------------------------------------------------------------- tick
-def run_tick(cfg: dict, dry_run: bool) -> int:
+def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
     if KILL.exists():
         print("KILL switch present — loop halted. (data/KILL を削除すると再開)")
         return 2
@@ -269,12 +350,32 @@ def run_tick(cfg: dict, dry_run: bool) -> int:
                          {"error": traceback.format_exc()[-500:]})
     conn.commit()
 
+    # RESEARCH
+    researched = None
+    if cfg.get("research"):
+        try:
+            researched = rss.research(cfg, conn, tick_id)
+            print(f"  RESEARCH: +{researched['added']} items")
+        except Exception:
+            print("  RESEARCH: FAILED")
+            traceback.print_exc()
+
     # TRIAGE
     triaged = triage(cfg, conn, tick_id, sensed)
     print(f"  TRIAGE: opened={len(triaged['opened'])} resolved={len(triaged['resolved'])}")
 
+    # CREATE → ゲート → DISTRIBUTE
+    created = maybe_create(cfg, conn, tick_id, dry_run, force=force_create)
+    if created.get("published"):
+        print(f"  CREATE: published {created['published']['url']}")
+    elif created.get("rejected"):
+        print(f"  CREATE: rejected ({created['rejected']['reasons'][:2]})")
+    else:
+        print(f"  CREATE: skip ({created.get('skipped')})")
+
     # REPORT
-    report_md = build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run)
+    report_md = build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run,
+                                researched=researched, created=created)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / f"tick-{tick_id}.md").write_text(report_md, encoding="utf-8")
 
@@ -299,10 +400,12 @@ def run_tick(cfg: dict, dry_run: bool) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description="AIKnowledgeCMS loop tick runner")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--force-create", action="store_true",
+                    help="日次予算を無視してCREATEを強制実行(テスト用)")
     ap.add_argument("--loopfile", default=None)
     args = ap.parse_args()
     cfg = loopfile.load(args.loopfile)
-    return run_tick(cfg, args.dry_run)
+    return run_tick(cfg, args.dry_run, force_create=args.force_create)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,32 @@ cadence:
 # SENSE: 有効なセンサ
 sensors: [http_health, simpletrack]
 
+# RESEARCH: コレクタ(毎tick・軽量)
+research:
+  feeds:
+    - https://hnrss.org/frontpage
+    - https://hnrss.org/newest?q=AI+agent
+    - https://techcrunch.com/category/artificial-intelligence/feed/
+  niche_keywords: [agent, agents, mcp, x402, a2a, claude, codex, llm, monetiz,
+                   autonomous, crypto, payment, stablecoin, openai, anthropic]
+  max_items_per_tick: 30
+
+# CREATE: 記事生成(日次・予算内)
+create:
+  articles_per_day: 1
+  max_attempts_per_day: 2      # ゲート不合格時の再試行込み上限
+  ollama_api: http://192.168.0.3:11434
+  generator:
+    kind: ollama               # ollama / cli (agent_cliを使用)
+    model: gemma4:12b-it-qat
+  verifier:
+    kind: ollama
+    model: gemma4:12b-it-qat   # 検証は同モデルでも別呼び出し(温度0.1)で分離
+  language: ja
+  theme: >
+    AIエージェント経済(エージェントに仕事をさせて稼ぐ・x402/MCP/A2A・
+    AIによる収益化・自律エージェントの実務応用)についての短い考察記事。
+
 http_health:
   watch_pages:
     - /
@@ -32,10 +58,15 @@ thresholds:
   pv_drop_pct: 30        # 前tick比でこの%以上PVが落ちたらissue
   slow_page_ms: 4000     # 応答がこれより遅いページはissue
 
-# DISTRIBUTE(Phase1はレポート公開のみ)
+# DISTRIBUTE
 publisher:
   kind: ftp
-  remote_dir: /web/aiknowledgecms_exbridge_jp/loop
+  remote_dir: /web/aiknowledgecms_exbridge_jp/loop        # ループレポート
+  articles_dir: /web/aiknowledgecms_exbridge_jp/articles  # 生成記事
+announcer:
+  kind: aixsns
+  api: https://aixec.exbridge.jp/api.php?path=posts
+  author: codex
 
 # ガードレール
 budgets:
