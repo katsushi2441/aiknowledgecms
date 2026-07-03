@@ -30,124 +30,189 @@
 </script>
 <style>
 :root {
-  --bg:#0d1220; --bg2:#111a2e; --panel:rgba(255,255,255,.045); --line:rgba(125,150,220,.22);
-  --ink:#e8edf9; --muted:#9aa8c7; --accent:#6d8dff; --accent2:#38bdf8; --good:#34d399; --gold:#fbbf24;
+  --ink:#101828; --body:#475467; --faint:#98a2b3; --line:#e9edf3; --line2:#d0d5dd;
+  --bg:#ffffff; --soft:#f7f9fc; --card:#ffffff;
+  --accent:#4f46e5; --accent-soft:#eef0fe; --cyan:#0891b2; --cyan-soft:#e6f7fb;
+  --green:#059669; --green-soft:#e8f7f1; --amber:#b45309; --amber-soft:#fdf3e3;
   --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{color:var(--ink);font-family:"Inter",-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
-  background:radial-gradient(1200px 500px at 18% -10%,rgba(109,141,255,.16),transparent 55%),
-             radial-gradient(900px 420px at 95% 0%,rgba(56,189,248,.10),transparent 50%),
-             linear-gradient(170deg,var(--bg) 0%,var(--bg2) 100%);
-  min-height:100vh;overflow-x:hidden;line-height:1.7}
+body{color:var(--ink);background:var(--bg);line-height:1.7;
+  font-family:"Inter",-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{text-decoration:none;color:inherit}
 img{max-width:100%}
-code,pre{font-family:var(--mono)}
+code{font-family:var(--mono);font-size:.92em;background:var(--soft);border:1px solid var(--line);
+  border-radius:6px;padding:1px 6px;color:var(--accent)}
 
-header{position:sticky;top:0;z-index:40;background:rgba(13,18,32,.85);backdrop-filter:blur(14px);
-  border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
-  padding:10px 24px;gap:14px}
+/* ---------- header ---------- */
+header{position:sticky;top:0;z-index:40;background:rgba(255,255,255,.85);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line)}
+.hwrap{max-width:1120px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;
+  gap:14px;padding:10px 24px}
 .horynth{flex:0 0 auto;line-height:0}
-.horynth img{height:40px;width:auto;display:block}
-.hbrand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:16px}
-.hbrand .mark{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:16px}
-.hbrand sub{font-size:10.5px;font-weight:700;color:var(--muted);display:block;margin-top:-2px;letter-spacing:.05em}
-.hactions{display:flex;gap:9px;align-items:center}
-.btn{border:0;border-radius:10px;padding:9px 18px;font-weight:800;cursor:pointer;font-size:13.5px;display:inline-flex;align-items:center;gap:7px}
-.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 8px 24px rgba(109,141,255,.35)}
-.btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--muted)}
+.horynth img{height:38px;width:auto;display:block}
+.hbrand{display:flex;align-items:center;gap:11px;font-weight:800;font-size:15.5px;letter-spacing:-.01em}
+.hbrand .mark{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--accent),#7c6ff0);color:#fff;font-size:17px;font-weight:900;
+  box-shadow:0 4px 12px rgba(79,70,229,.25)}
+.hbrand sub{font-size:10px;font-weight:700;color:var(--faint);display:block;margin-top:-1px;letter-spacing:.12em}
+.hactions{display:flex;gap:8px;align-items:center}
+.btn{border:0;border-radius:10px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:13.5px;
+  display:inline-flex;align-items:center;gap:7px;transition:all .15s}
+.btn-primary{background:var(--ink);color:#fff}
+.btn-primary:hover{background:#2a3446}
+.btn-ghost{background:#fff;border:1px solid var(--line2);color:var(--body)}
+.btn-ghost:hover{border-color:var(--faint)}
 
-.hero{max-width:1060px;margin:0 auto;padding:60px 24px 40px;text-align:left}
-.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1.5px solid var(--line);
-  border-radius:999px;padding:7px 14px;font-size:11.5px;font-weight:800;color:var(--accent2);
-  letter-spacing:.12em;text-transform:uppercase;margin-bottom:22px}
-h1{font-size:clamp(30px,4.4vw,56px);font-weight:900;line-height:1.15;letter-spacing:-.02em;margin-bottom:20px;max-width:820px}
-h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--accent2));
+/* ---------- hero ---------- */
+.hero{position:relative;max-width:1120px;margin:0 auto;padding:88px 24px 72px;text-align:center}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;
+  background-image:radial-gradient(circle,#dfe5ef 1.1px,transparent 1.1px);
+  background-size:26px 26px;
+  -webkit-mask-image:radial-gradient(ellipse 65% 80% at 50% 30%,#000 30%,transparent 75%);
+  mask-image:radial-gradient(ellipse 65% 80% at 50% 30%,#000 30%,transparent 75%)}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line2);
+  border-radius:999px;padding:7px 16px;font-size:12px;font-weight:700;color:var(--accent);
+  letter-spacing:.1em;text-transform:uppercase;margin-bottom:28px;
+  box-shadow:0 2px 8px rgba(16,24,40,.05)}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2.2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.75)}}
+h1{font-size:clamp(34px,5.4vw,66px);font-weight:800;line-height:1.1;letter-spacing:-.035em;
+  margin:0 auto 24px;max-width:900px}
+h1 em{font-style:normal;background:linear-gradient(92deg,var(--accent) 10%,var(--cyan) 90%);
   -webkit-background-clip:text;background-clip:text;color:transparent}
-.lead{font-size:17px;color:var(--muted);max-width:720px;margin-bottom:28px}
-.hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px}
-.btn-hero{border-radius:14px;padding:14px 28px;font-size:15px}
-.phase-pill{display:inline-flex;align-items:center;gap:8px;background:rgba(251,191,36,.1);
-  border:1.5px solid rgba(251,191,36,.4);color:var(--gold);border-radius:999px;padding:7px 14px;
-  font-size:12.5px;font-weight:800}
+.lead{font-size:17.5px;color:var(--body);max-width:660px;margin:0 auto 34px}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:26px}
+.btn-hero{border-radius:12px;padding:14px 28px;font-size:15px}
+.phase-pill{display:inline-flex;align-items:center;gap:8px;background:var(--amber-soft);
+  border:1px solid #f2d9ae;color:var(--amber);border-radius:999px;padding:8px 16px;
+  font-size:12.5px;font-weight:700}
 
-section{max-width:1060px;margin:0 auto;padding:44px 24px}
-.section-eyebrow{font-size:11.5px;font-weight:800;letter-spacing:.14em;color:var(--accent2);text-transform:uppercase;margin-bottom:10px}
-h2{font-size:clamp(22px,3vw,34px);font-weight:900;letter-spacing:-.02em;margin-bottom:12px}
-.section-lead{font-size:15px;color:var(--muted);max-width:680px;margin-bottom:32px}
+/* ---------- sections ---------- */
+section{max-width:1120px;margin:0 auto;padding:64px 24px}
+.section-head{text-align:center;max-width:640px;margin:0 auto 44px}
+.section-eyebrow{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.14em;
+  color:var(--accent);text-transform:uppercase;margin-bottom:12px}
+h2{font-size:clamp(24px,3.2vw,38px);font-weight:800;letter-spacing:-.03em;margin-bottom:14px;line-height:1.25}
+.section-lead{font-size:15.5px;color:var(--body)}
 
-/* loop stages */
+/* ---------- loop pipeline ---------- */
 .loop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.stage{background:var(--panel);border:1.5px solid var(--line);border-radius:16px;padding:20px}
-.stage .tag{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent2);
-  background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);border-radius:6px;
-  padding:3px 8px;display:inline-block;margin-bottom:10px}
-.stage h3{font-size:16px;font-weight:900;margin-bottom:7px}
-.stage p{font-size:13px;color:var(--muted);line-height:1.75}
-.loop-back{grid-column:1/-1;text-align:center;background:rgba(52,211,153,.07);border:1.5px dashed rgba(52,211,153,.4);
-  border-radius:14px;padding:14px;font-size:13.5px;color:var(--good);font-weight:800}
+.stage{position:relative;background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:26px 22px 22px;box-shadow:0 1px 3px rgba(16,24,40,.04);transition:all .18s}
+.stage:hover{box-shadow:0 12px 32px rgba(16,24,40,.09);transform:translateY(-2px);border-color:var(--line2)}
+.stage .num{position:absolute;top:-13px;left:20px;width:26px;height:26px;border-radius:8px;
+  background:var(--ink);color:#fff;font-family:var(--mono);font-size:12.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
+.stage .tag{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;
+  color:var(--accent);display:block;margin-bottom:8px}
+.stage h3{font-size:16.5px;font-weight:800;margin-bottom:7px;letter-spacing:-.01em}
+.stage p{font-size:13.5px;color:var(--body);line-height:1.75}
+.loop-back{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:10px;
+  background:var(--green-soft);border:1.5px dashed #a7dcc8;border-radius:14px;padding:16px;
+  font-size:14px;color:var(--green);font-weight:700}
+.loop-back .arrow{font-size:20px}
 
-/* components table */
-.comp-table{width:100%;border-collapse:collapse;font-size:13.5px}
-.comp-table th,.comp-table td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}
-.comp-table th{background:rgba(109,141,255,.08);color:var(--accent2);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
-.comp-table td b{color:var(--ink)}
-.comp-table td{color:var(--muted)}
-.table-scroll{overflow-x:auto}
+/* ---------- architecture ---------- */
+.arch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.arch{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px 22px;
+  box-shadow:0 1px 3px rgba(16,24,40,.04)}
+.arch .icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-size:20px;margin-bottom:14px}
+.arch h3{font-size:15.5px;font-weight:800;margin-bottom:7px;letter-spacing:-.01em}
+.arch p{font-size:13px;color:var(--body);line-height:1.75}
+.i-indigo{background:var(--accent-soft)} .i-cyan{background:var(--cyan-soft)}
+.i-green{background:var(--green-soft)} .i-amber{background:var(--amber-soft)}
+.i-rose{background:#fdeef2} .i-slate{background:#f0f3f8}
 
-/* code */
-pre{background:#0a0f1c;border:1.5px solid var(--line);border-radius:14px;padding:20px;
-  font-size:12.5px;line-height:1.8;overflow-x:auto;color:#c8d4f0}
-pre .k{color:var(--accent2)}
-pre .v{color:var(--good)}
-pre .c{color:#5b6b8f}
+/* ---------- loopfile ---------- */
+.code-split{display:grid;grid-template-columns:1fr 1.1fr;gap:36px;align-items:center}
+.code-split>*{min-width:0}
+.code-window{background:#0f172a;border-radius:16px;overflow:hidden;
+  box-shadow:0 24px 60px rgba(15,23,42,.28)}
+.code-bar{display:flex;align-items:center;gap:7px;padding:13px 16px;background:#1e293b}
+.code-bar span{width:11px;height:11px;border-radius:50%}
+.code-bar .r{background:#f87171}.code-bar .y{background:#fbbf24}.code-bar .g{background:#34d399}
+.code-bar b{margin-left:8px;font-family:var(--mono);font-size:12px;color:#94a3b8;font-weight:400}
+pre{padding:22px 24px;font-family:var(--mono);font-size:12.8px;line-height:1.85;overflow-x:auto;color:#cbd5e1}
+pre .k{color:#7dd3fc}
+pre .v{color:#86efac}
+pre .c{color:#64748b}
+.code-desc h2{margin-bottom:14px}
+.code-desc p{font-size:15px;color:var(--body);margin-bottom:18px}
+.check-list{list-style:none;display:grid;gap:10px}
+.check-list li{display:flex;gap:10px;font-size:14px;color:var(--body)}
+.check-list li::before{content:"✓";flex:0 0 auto;width:22px;height:22px;border-radius:50%;
+  background:var(--green-soft);color:var(--green);font-weight:800;font-size:12px;
+  display:flex;align-items:center;justify-content:center;margin-top:2px}
 
-/* guardrails */
+/* ---------- guardrails ---------- */
+.band{background:var(--soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .guards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.guard{background:var(--panel);border:1.5px solid var(--line);border-radius:14px;padding:18px 16px}
-.guard .em{font-size:24px;display:block;margin-bottom:8px}
-.guard h4{font-size:14px;font-weight:900;margin-bottom:5px}
-.guard p{font-size:12px;color:var(--muted);line-height:1.7}
+.guard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px 20px;
+  box-shadow:0 1px 3px rgba(16,24,40,.04)}
+.guard .em{font-size:26px;display:block;margin-bottom:12px}
+.guard h4{font-size:14.5px;font-weight:800;margin-bottom:6px}
+.guard p{font-size:12.5px;color:var(--body);line-height:1.75}
 
-/* roadmap */
-.roadmap{display:grid;gap:10px}
-.phase{display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1.5px solid var(--line);
-  border-radius:14px;padding:16px 18px}
-.phase .pnum{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent2);
-  border:1.5px solid rgba(56,189,248,.4);border-radius:8px;padding:4px 9px;white-space:nowrap;margin-top:2px}
-.phase.current{border-color:rgba(251,191,36,.5);background:rgba(251,191,36,.06)}
-.phase.current .pnum{color:var(--gold);border-color:rgba(251,191,36,.5)}
-.phase h4{font-size:14.5px;font-weight:900;margin-bottom:4px}
-.phase p{font-size:13px;color:var(--muted)}
+/* ---------- dogfood ---------- */
+.dogfood{background:linear-gradient(120deg,#f5f4ff 0%,#eefafd 100%);
+  border:1px solid #e2e4f8;border-radius:24px;padding:52px 48px;text-align:center}
+.dogfood h2{margin-bottom:14px}
+.dogfood p{font-size:15.5px;color:var(--body);max-width:680px;margin:0 auto}
 
-/* dogfood */
-.dogfood{background:linear-gradient(135deg,rgba(109,141,255,.14),rgba(56,189,248,.08));
-  border:1.5px solid var(--line);border-radius:20px;padding:30px}
-.dogfood h2{margin-bottom:10px}
-.dogfood p{font-size:14.5px;color:var(--muted);max-width:720px}
+/* ---------- roadmap ---------- */
+.roadmap{max-width:760px;margin:0 auto;display:grid;gap:0;position:relative}
+.roadmap::before{content:"";position:absolute;left:31px;top:20px;bottom:20px;width:2px;
+  background:var(--line)}
+.phase{position:relative;display:flex;gap:20px;padding:16px 0}
+.phase .pnum{position:relative;z-index:1;flex:0 0 auto;width:64px;height:32px;border-radius:9px;
+  background:#fff;border:1.5px solid var(--line2);color:var(--faint);
+  font-family:var(--mono);font-size:11.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;margin-top:2px}
+.phase.current .pnum{background:var(--ink);border-color:var(--ink);color:#fff}
+.phase .pbody{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:16px 20px;flex:1;box-shadow:0 1px 3px rgba(16,24,40,.04)}
+.phase.current .pbody{border-color:#c9c5f5;background:linear-gradient(120deg,#fbfaff,#fff)}
+.phase h4{font-size:14.5px;font-weight:800;margin-bottom:4px}
+.phase h4 .now{display:inline-block;margin-left:8px;font-size:10.5px;font-weight:800;color:var(--accent);
+  background:var(--accent-soft);border-radius:999px;padding:2px 9px;vertical-align:1px;letter-spacing:.06em}
+.phase p{font-size:13px;color:var(--body)}
 
-footer{border-top:1px solid var(--line);padding:26px 24px;max-width:1060px;margin:20px auto 0}
-.footer-links{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px}
-.footer-links a{font-size:13px;color:var(--muted);font-weight:700}
-.footer-links a:hover{color:var(--accent2)}
-.footer-copy{font-size:12px;color:#5b6b8f}
+/* ---------- footer ---------- */
+footer{border-top:1px solid var(--line);background:var(--soft)}
+.fwrap{max-width:1120px;margin:0 auto;padding:34px 24px}
+.footer-links{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:16px}
+.footer-links a{font-size:13px;color:var(--body);font-weight:600}
+.footer-links a:hover{color:var(--accent)}
+.footer-copy{font-size:12px;color:var(--faint)}
 
-@media(max-width:820px){
-  .loop-grid{grid-template-columns:1fr}
+@media(max-width:860px){
+  .loop-grid,.arch-grid{grid-template-columns:1fr}
   .guards{grid-template-columns:1fr 1fr}
-  .hero{padding:38px 18px 26px}
-  section{padding:32px 18px}
-  header{padding:9px 14px}
-  .horynth img{height:32px}
-  .hactions .btn-ghost{padding:9px 12px}
+  .code-split{grid-template-columns:1fr;gap:24px}
+  .hero{padding:56px 18px 48px}
+  section{padding:44px 18px}
+  .hwrap{padding:9px 14px}
+  .horynth img{height:30px}
+  .hbrand sub{display:none}
+  .dogfood{padding:36px 22px}
+  .roadmap::before{left:31px}
+}
+@media(max-width:560px){
+  .guards{grid-template-columns:1fr}
+  .hero-cta .btn-hero{width:100%;justify-content:center}
+  /* 狭幅ではブランド名を隠しロゴマークのみ(バッジ+ボタンと共存させる) */
+  .hbrand>span:last-child{display:none}
+  .btn{padding:9px 12px;font-size:12.5px}
 }
 </style>
 </head>
 <body>
 
-<header>
+<header><div class="hwrap">
   <a class="horynth" href="https://orynth.dev/projects/aiknowledgecms" target="_blank" rel="noopener">
     <img src="https://orynth.dev/api/badge/aiknowledgecms?theme=light&style=default" alt="Featured on Orynth" width="190" height="60">
   </a>
@@ -159,100 +224,119 @@ footer{border-top:1px solid var(--line);padding:26px 24px;max-width:1060px;margi
     <a class="btn btn-ghost" href="aiknowledgecms.html">日本語</a>
     <a class="btn btn-primary" href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">GitHub →</a>
   </div>
-</header>
+</div></header>
 
 <!-- ===== HERO ===== -->
 <div class="hero">
-  <div class="eyebrow">Loop Engineering for Website Growth</div>
-  <h1>A CMS operated by <em>an agent loop</em>,<br>not by you.</h1>
+  <div class="eyebrow"><span class="dot"></span>Loop Engineering for Website Growth</div>
+  <h1>A CMS operated by<br><em>an agent loop</em>, not by you.</h1>
   <p class="lead">
-    AIKnowledgeCMS is an open framework where an AI agent runs an endless growth loop over your knowledge site:
-    it senses the site's health, researches what matters, triages issues, acts on them,
-    creates content, distributes it — and feeds the results back into the next cycle.
+    An AI agent runs an endless growth loop over your knowledge site — sensing its health,
+    researching what matters, triaging issues, acting, creating and distributing content,
+    then feeding every result back into the next cycle.
     There is no admin panel. There is a loop.
   </p>
   <div class="hero-cta">
     <a class="btn btn-primary btn-hero" href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">View on GitHub</a>
-    <a class="btn btn-ghost btn-hero" href="#loop">See the Loop</a>
+    <a class="btn btn-ghost btn-hero" href="#loop">See the Loop ↓</a>
   </div>
   <span class="phase-pill">⚙ Phase 0 — Concept &amp; spec public. Reference implementation in progress on this very site.</span>
 </div>
 
 <!-- ===== THE LOOP ===== -->
 <section id="loop">
-  <div class="section-eyebrow">The Growth Loop</div>
-  <h2>One tick, six stages</h2>
-  <p class="section-lead">
-    Each cycle is a resumable "tick" — not a runaway <code>while(true)</code>.
-    A scheduler fires the tick; the agent walks the stages guided by playbooks; every result is measured and written back.
-  </p>
+  <div class="section-head">
+    <span class="section-eyebrow">The Growth Loop</span>
+    <h2>One tick, six stages</h2>
+    <p class="section-lead">
+      Each cycle is a resumable "tick" — not a runaway <code>while(true)</code>.
+      A scheduler fires the tick; the agent walks the stages guided by playbooks; every result is measured and written back.
+    </p>
+  </div>
   <div class="loop-grid">
-    <div class="stage"><span class="tag">1 · SENSE</span><h3>Monitor the site</h3><p>Analytics, Search Console, access logs, revenue and uptime become structured observations in the loop's memory.</p></div>
-    <div class="stage"><span class="tag">2 · RESEARCH</span><h3>Collect information</h3><p>Trends, sources and competitor signals are gathered by collector adapters — the raw material for decisions.</p></div>
-    <div class="stage"><span class="tag">3 · TRIAGE</span><h3>Organize the issues</h3><p>Observations become a prioritized issue queue: traffic drops, indexing errors, content gaps, stale pages.</p></div>
-    <div class="stage"><span class="tag">4 · ACT</span><h3>Fix what's broken</h3><p>The agent works issues via playbooks — SEO fixes, site changes through git worktrees and pull requests.</p></div>
-    <div class="stage"><span class="tag">5 · CREATE</span><h3>Generate content</h3><p>Articles, videos and share cards are generated — and must pass quality gates (a separate verifier agent) before anything ships.</p></div>
-    <div class="stage"><span class="tag">6 · DISTRIBUTE</span><h3>Publish &amp; announce</h3><p>Publisher and announcer adapters push content to the site, social feeds and video platforms.</p></div>
-    <div class="loop-back">↺ MEASURE — results flow back into SENSE. The loop learns what grew the site, and does more of that.</div>
+    <div class="stage"><span class="num">1</span><span class="tag">SENSE</span><h3>Monitor the site</h3><p>Analytics, Search Console, access logs, revenue and uptime become structured observations in the loop's memory.</p></div>
+    <div class="stage"><span class="num">2</span><span class="tag">RESEARCH</span><h3>Collect information</h3><p>Trends, sources and competitor signals are gathered by collector adapters — the raw material for decisions.</p></div>
+    <div class="stage"><span class="num">3</span><span class="tag">TRIAGE</span><h3>Organize the issues</h3><p>Observations become a prioritized issue queue: traffic drops, indexing errors, content gaps, stale pages.</p></div>
+    <div class="stage"><span class="num">4</span><span class="tag">ACT</span><h3>Fix what's broken</h3><p>The agent works issues via playbooks — SEO fixes and site changes land through git worktrees as pull requests.</p></div>
+    <div class="stage"><span class="num">5</span><span class="tag">CREATE</span><h3>Generate content</h3><p>Articles, videos and share cards are generated — and must pass quality gates (a separate verifier agent) before anything ships.</p></div>
+    <div class="stage"><span class="num">6</span><span class="tag">DISTRIBUTE</span><h3>Publish &amp; announce</h3><p>Publisher and announcer adapters push content to the site, social feeds and video platforms.</p></div>
+    <div class="loop-back"><span class="arrow">↺</span> MEASURE — results flow back into SENSE. The loop learns what grew the site, and does more of that.</div>
   </div>
 </section>
 
 <!-- ===== COMPONENTS ===== -->
 <section>
-  <div class="section-eyebrow">Architecture</div>
-  <h2>Six components, agent-agnostic</h2>
-  <p class="section-lead">
-    The agent is replaceable — any agent CLI (<code>claude -p</code>, <code>codex exec</code>) can execute a stage.
-    The loop is the product.
-  </p>
-  <div class="table-scroll">
-  <table class="comp-table">
-    <tr><th>Component</th><th>What it does</th></tr>
-    <tr><td><b>Ticks &amp; scheduling</b></td><td>cron/systemd fires resumable ticks per cadence (sense hourly, create daily, act weekly). Crash-safe: every tick starts from persisted state.</td></tr>
-    <tr><td><b>Playbooks</b></td><td>Procedures are first-class files. The agent must read the playbook before executing a stage — no improvisation on production.</td></tr>
-    <tr><td><b>Adapters</b></td><td>Pluggable sensors / collectors / generators / publishers / announcers. Swap Google Search Console for Plausible, FTP for GitHub Pages.</td></tr>
-    <tr><td><b>Quality gates</b></td><td>Creator and verifier are separate agents. Content that fails factuality or SEO gates is repaired or discarded — never silently published.</td></tr>
-    <tr><td><b>Memory</b></td><td>SQLite holds the issue queue, content ledger, metrics time series and a decision log you can audit.</td></tr>
-    <tr><td><b>Worktrees</b></td><td>Site-modifying actions run in isolated git worktrees and land as reviewable pull requests.</td></tr>
-  </table>
+  <div class="section-head">
+    <span class="section-eyebrow">Architecture</span>
+    <h2>Six components, agent-agnostic</h2>
+    <p class="section-lead">
+      The agent is replaceable — any agent CLI (<code>claude -p</code>, <code>codex exec</code>) can execute a stage.
+      The loop is the product.
+    </p>
+  </div>
+  <div class="arch-grid">
+    <div class="arch"><span class="icon i-indigo">⏱</span><h3>Ticks &amp; scheduling</h3><p>cron/systemd fires resumable ticks per cadence — sense hourly, create daily, act weekly. Crash-safe: every tick starts from persisted state.</p></div>
+    <div class="arch"><span class="icon i-cyan">📖</span><h3>Playbooks</h3><p>Procedures are first-class files. The agent must read the playbook before executing a stage — no improvisation on production.</p></div>
+    <div class="arch"><span class="icon i-green">🔌</span><h3>Adapters</h3><p>Pluggable sensors / collectors / generators / publishers / announcers. Swap Search Console for Plausible, FTP for GitHub Pages.</p></div>
+    <div class="arch"><span class="icon i-rose">🛡</span><h3>Quality gates</h3><p>Creator and verifier are separate agents. Content that fails factuality or SEO gates is repaired or discarded — never silently published.</p></div>
+    <div class="arch"><span class="icon i-amber">🗄</span><h3>Memory</h3><p>SQLite holds the issue queue, content ledger, metrics time series and a decision log you can audit.</p></div>
+    <div class="arch"><span class="icon i-slate">🌿</span><h3>Worktrees</h3><p>Site-modifying actions run in isolated git worktrees and land as reviewable pull requests.</p></div>
   </div>
 </section>
 
 <!-- ===== LOOPFILE ===== -->
 <section>
-  <div class="section-eyebrow">Declarative</div>
-  <h2>One Loopfile per site</h2>
-  <p class="section-lead">The whole loop — KPIs, cadence, budgets, gates, escalation — is declared in a single file.</p>
-<pre><span class="c"># loopfile.yaml</span>
-<span class="k">site:</span> <span class="v">aiknowledgecms.exbridge.jp</span>
+  <div class="code-split">
+    <div class="code-window">
+      <div class="code-bar"><span class="r"></span><span class="y"></span><span class="g"></span><b>loopfile.yaml</b></div>
+<pre><span class="k">site:</span> <span class="v">aiknowledgecms.exbridge.jp</span>
 <span class="k">kpi:</span> [<span class="v">pv_weekly</span>, <span class="v">affiliate_clicks</span>, <span class="v">indexed_pages</span>]
-<span class="k">cadence:</span> { <span class="k">sense:</span> <span class="v">hourly</span>, <span class="k">create:</span> <span class="v">daily</span>, <span class="k">act:</span> <span class="v">weekly</span> }
-<span class="k">budgets:</span> { <span class="k">articles_per_day:</span> <span class="v">3</span>, <span class="k">llm_cost_per_tick_usd:</span> <span class="v">2.0</span> }
+<span class="k">cadence:</span>
+  <span class="k">sense:</span> <span class="v">hourly</span>
+  <span class="k">create:</span> <span class="v">daily</span>
+  <span class="k">act:</span> <span class="v">weekly</span>
+<span class="k">budgets:</span>
+  <span class="k">articles_per_day:</span> <span class="v">3</span>
+  <span class="k">llm_cost_per_tick_usd:</span> <span class="v">2.0</span>
 <span class="k">gates:</span> [<span class="v">factuality_check</span>, <span class="v">seo_check</span>]
 <span class="k">escalate_when:</span> [<span class="v">revenue_drop_30pct</span>, <span class="v">index_errors</span>]
 <span class="k">adapters:</span>
   <span class="k">sensors:</span> [<span class="v">gsc</span>, <span class="v">simpletrack</span>]
   <span class="k">publisher:</span> <span class="v">ftp_heteml</span>
   <span class="k">announcer:</span> <span class="v">aixsns</span></pre>
+    </div>
+    <div class="code-desc">
+      <span class="section-eyebrow">Declarative</span>
+      <h2>One Loopfile per site</h2>
+      <p>The whole loop — KPIs, cadence, budgets, gates, escalation — is declared in a single file. Point the runner at a Loopfile and the site starts growing.</p>
+      <ul class="check-list">
+        <li>KPIs define what "growth" means for this site — the loop optimizes for them</li>
+        <li>Cadence controls how often each stage runs, independently</li>
+        <li>Budgets and gates are enforced by the runner, not left to the agent's judgment</li>
+      </ul>
+    </div>
+  </div>
 </section>
 
 <!-- ===== GUARDRAILS ===== -->
-<section>
-  <div class="section-eyebrow">Loop Engineering</div>
-  <h2>Loops amplify judgment — so brakes are part of the spec</h2>
-  <p class="section-lead">An autonomous infinite loop without guardrails is a liability. These are built in, not bolted on.</p>
+<div class="band"><section>
+  <div class="section-head">
+    <span class="section-eyebrow">Loop Engineering</span>
+    <h2>Loops amplify judgment —<br>so brakes are part of the spec</h2>
+    <p class="section-lead">An autonomous infinite loop without guardrails is a liability. These are built in, not bolted on.</p>
+  </div>
   <div class="guards">
     <div class="guard"><span class="em">💰</span><h4>Budgets</h4><p>Hard caps per tick: LLM cost, article count, API calls. The loop stops before your wallet does.</p></div>
-    <div class="guard"><span class="em">🧪</span><h4>Dry-run</h4><p>Every stage can run in dry-run mode: full reasoning, zero side effects. Audit before you trust.</p></div>
+    <div class="guard"><span class="em">🧪</span><h4>Dry-run</h4><p>Every stage can run with full reasoning and zero side effects. Audit before you trust.</p></div>
     <div class="guard"><span class="em">🛑</span><h4>Kill switch</h4><p>One flag halts the loop. State is persisted, so resuming is safe.</p></div>
     <div class="guard"><span class="em">🙋</span><h4>Escalation</h4><p>Declared conditions page a human (email / LINE). Verification stays a human responsibility.</p></div>
   </div>
-</section>
+</section></div>
 
 <!-- ===== DOGFOOD ===== -->
 <section>
   <div class="dogfood">
-    <div class="section-eyebrow">Dogfooding</div>
+    <span class="section-eyebrow">Dogfooding</span>
     <h2>This site is the reference deployment</h2>
     <p>
       aiknowledgecms.exbridge.jp itself is being rebuilt as the framework's first instance:
@@ -265,17 +349,19 @@ footer{border-top:1px solid var(--line);padding:26px 24px;max-width:1060px;margi
 
 <!-- ===== ROADMAP ===== -->
 <section>
-  <div class="section-eyebrow">Roadmap</div>
-  <h2>Where this is going</h2>
+  <div class="section-head">
+    <span class="section-eyebrow">Roadmap</span>
+    <h2>Where this is going</h2>
+  </div>
   <div class="roadmap">
-    <div class="phase current"><span class="pnum">Phase 0</span><div><h4>Concept &amp; spec — you are here</h4><p>Manifesto, Loopfile specification, architecture. Public from day one.</p></div></div>
-    <div class="phase"><span class="pnum">Phase 1</span><div><h4>Core tick runner + SENSE / TRIAGE / REPORT</h4><p>Real sensors (Search Console, access analytics) populate the issue queue in SQLite. Every tick emits a loop report.</p></div></div>
-    <div class="phase"><span class="pnum">Phase 2</span><div><h4>CREATE / DISTRIBUTE + quality gates</h4><p>Generator, publisher and announcer adapters wired; verifier agents gate all output. The media starts growing.</p></div></div>
-    <div class="phase"><span class="pnum">Phase 3</span><div><h4>ACT + share features</h4><p>Site-modifying playbooks via worktrees; diagnosis cards, growth cards and dashboards that users want to share.</p></div></div>
+    <div class="phase current"><span class="pnum">P0</span><div class="pbody"><h4>Concept &amp; spec<span class="now">YOU ARE HERE</span></h4><p>Manifesto, Loopfile specification, architecture. Public from day one.</p></div></div>
+    <div class="phase"><span class="pnum">P1</span><div class="pbody"><h4>Core tick runner + SENSE / TRIAGE / REPORT</h4><p>Real sensors (Search Console, access analytics) populate the issue queue in SQLite. Every tick emits a loop report.</p></div></div>
+    <div class="phase"><span class="pnum">P2</span><div class="pbody"><h4>CREATE / DISTRIBUTE + quality gates</h4><p>Generator, publisher and announcer adapters wired; verifier agents gate all output. The media starts growing.</p></div></div>
+    <div class="phase"><span class="pnum">P3</span><div class="pbody"><h4>ACT + share features</h4><p>Site-modifying playbooks via worktrees; diagnosis cards, growth cards and dashboards that users want to share.</p></div></div>
   </div>
 </section>
 
-<footer>
+<footer><div class="fwrap">
   <div class="footer-links">
     <a href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">GitHub</a>
     <a href="aiknowledgecms.html">日本語</a>
@@ -288,6 +374,6 @@ footer{border-top:1px solid var(--line);padding:26px 24px;max-width:1060px;margi
     <a href="sitemap.php">Sitemap</a>
   </div>
   <div class="footer-copy">© 2026 EXBRIDGE, Inc. All rights reserved. — This site participates in the Amazon Associates Program. Product links may contain affiliate links.</div>
-</footer>
+</div></footer>
 </body>
 </html>
