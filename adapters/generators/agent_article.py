@@ -58,6 +58,34 @@ def pick_sources(conn, n: int = 3):
 
 def build_prompt(cfg: dict, sources) -> str:
     theme = cfg["create"].get("theme", "")
+    # GSC opportunity(検索クエリ)起点なら「検索意図に答える解説記事」モード
+    gsc_sources = [s for s in sources if s["url"].startswith("gsc://")]
+    if gsc_sources:
+        q = gsc_sources[0]["title"].replace("検索クエリ「", "").split("」")[0]
+        news = [s for s in sources if not s["url"].startswith("gsc://")]
+        news_lines = "\n".join(
+            f"- {s['title']}\n  URL: {s['url']}\n  概要: {s['summary'] or '(なし)'}"
+            for s in news) or "(なし)"
+        return f"""あなたは技術メディア「AIKnowledgeCMS」の記事ライターです。
+Google検索クエリ「{q}」で検索する読者の疑問に答える、日本語の解説記事を書いてください。
+
+テーマ: {theme}
+
+# 補助素材(あれば根拠として使ってよい。この素材とあなたの一般的な技術知識の範囲で書く)
+{news_lines}
+
+# 執筆ルール
+- 900〜1500字。です・ます調。検索意図に最初の段落で直接答える。
+- 一般的な技術概念の説明はよいが、具体的な統計・日付・企業の動向・製品発表は素材にない限り書かない。
+- 記事内で参照するURLは補助素材のURLのみ使用可(無ければURLを書かない)。
+- 最後に「## 参考」を置き、使った補助素材URLを列挙(無ければ「- 一般的な技術解説です」と1行)。
+
+# 出力形式(厳守・この形式以外を出力しない)
+TITLE: <30〜60字の記事タイトル(クエリの語を含める)>
+SLUG: <英小文字とハイフンのみ12〜50字>
+---
+<本文markdown>
+"""
     src_lines = "\n".join(
         f"- {s['title']}\n  URL: {s['url']}\n  概要: {s['summary'] or '(なし)'}"
         for s in sources
@@ -124,7 +152,8 @@ def generate(cfg: dict, conn, tick_id: int) -> dict | None:
 
     src_urls = [s["url"] for s in sources]
     if "## 参考" not in parsed["body"] and "##参考" not in parsed["body"]:
-        refs = "\n".join(f"- {u}" for u in src_urls)
+        http_refs = [u for u in src_urls if u.startswith("http")]
+        refs = "\n".join(f"- {u}" for u in http_refs) or "- 一般的な技術解説です"
         parsed["body"] = parsed["body"].rstrip() + f"\n\n## 参考\n{refs}\n"
     conn.execute(
         "INSERT INTO content (slug, title, status, body_md, sources, created_tick, created_at)"

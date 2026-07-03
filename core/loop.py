@@ -24,7 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core import loopfile, state
-from adapters.sensors import http_health, simpletrack
+from adapters.sensors import gsc, http_health, simpletrack
 from adapters.collectors import rss
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +34,7 @@ KILL = ROOT / "data" / "KILL"
 SENSORS = {
     "http_health": http_health,
     "simpletrack": simpletrack,
+    "gsc": gsc,
 }
 
 
