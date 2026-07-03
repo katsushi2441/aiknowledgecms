@@ -1,19 +1,3 @@
-# OS
-.DS_Store
-Thumbs.db
-
-# Editor / IDE
-.vscode/
-.idea/
-
-# Python
+data/
+reports/
 __pycache__/
-*.pyc
-
-# Local scripts
-ftpphp.py
-
-# Build / temp
-*.log
-tmp/
-

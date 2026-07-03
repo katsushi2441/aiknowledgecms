@@ -1,188 +1,107 @@
 # AIKnowledgeCMS
 
-AIKnowledgeCMS is an AI-powered knowledge engine that continuously collects, structures, summarizes, and preserves domain-specific information as long-term accumulated knowledge.
+**A CMS operated by an agent loop, not by you.**
 
-Rather than publishing content, it is designed to **compound understanding over time**.
+AIKnowledgeCMS is a loop-engineering framework for website growth.
+An AI agent runs an endless growth loop over a knowledge site — sensing its health,
+researching what matters, triaging issues, acting on them, creating and distributing
+content, then feeding every result back into the next cycle.
 
----
+There is no admin panel. There is a loop.
 
-## Why AIKnowledgeCMS Exists
+- 🇬🇧 https://aiknowledgecms.exbridge.jp/
+- 🇯🇵 https://aiknowledgecms.exbridge.jp/aiknowledgecms.html
+- 📊 Live loop reports (dogfooding): https://aiknowledgecms.exbridge.jp/loop/
 
-Most CMS platforms are optimized for:
+## The Growth Loop
 
-- Publishing frequency
-- SEO and visibility
-- Manual content updates
+One cycle is a resumable **tick** — not a runaway `while(true)`:
 
-AIKnowledgeCMS takes a fundamentally different stance.
+```
+SENSE → RESEARCH → TRIAGE → ACT → CREATE → DISTRIBUTE
+  ↑                                            |
+  └──────────────── MEASURE ←──────────────────┘
+```
 
-- Learning happens continuously, even without posting
-- Knowledge should compound, not reset daily
-- A system should stay alive without constant human input
-- Daily summaries should emerge naturally from accumulated knowledge
+| Stage | What happens | Status |
+|---|---|---|
+| SENSE | Analytics / Search Console / access logs / uptime become structured observations | ✅ Phase 1 |
+| RESEARCH | Collector adapters gather trends and sources | Phase 2 |
+| TRIAGE | Observations become a prioritized issue queue | ✅ Phase 1 (rule-based) |
+| ACT | Playbook-driven fixes; site changes land as worktree PRs | Phase 3 |
+| CREATE | Content generation behind quality gates (separate verifier agent) | Phase 2 |
+| DISTRIBUTE | Publisher / announcer adapters ship the output | Phase 1: loop reports only |
 
-This project exists to support **quiet, consistent knowledge accumulation** driven by genuine interests, not engagement metrics.
+## Quick start (Phase 1)
 
----
+```bash
+# 1. Declare your site's loop
+$EDITOR loopfile.yaml
 
-## What AIKnowledgeCMS Does
+# 2. One tick, no side effects
+python3 -m core.loop --dry-run
 
-AIKnowledgeCMS operates as an autonomous knowledge engine:
+# 3. Live tick: sense → triage → publish the loop report
+python3 -m core.loop
 
-- Collects information from predefined, trusted sources
-- Structures and analyzes content using AI-assisted logic
-- Stores results as structured, date-based knowledge JSON
-- Generates daily structured summaries (`daily_summary.php`)
-- Preserves all historical context without overwriting
-- Provides lightweight first-party tracking (`simpletrack.php`)
+# 4. Run it forever (hourly)
+cp systemd/aiknowledgecms-loop.{service,timer} ~/.config/systemd/user/
+systemctl --user enable --now aiknowledgecms-loop.timer
+```
 
-The system grows naturally alongside your thinking, research, or observation process.
+Requirements: Python 3.10+, PyYAML. No other dependencies — memory is SQLite.
 
----
+## Loopfile
 
-## How It Works (Conceptual Flow)
+The whole loop — KPIs, cadence, budgets, gates, escalation — is declared in one file:
 
-1. External information is collected per topic or keyword
-2. Each item is structured and stored as knowledge JSON
-3. Daily knowledge is automatically summarized
-4. Summaries can optionally feed downstream audio/media layers
-5. Knowledge remains accessible, searchable, and cumulative
+```yaml
+site: https://aiknowledgecms.exbridge.jp
+kpi: [pv_24h, uniq_ips_24h, pages_healthy]
+sensors: [http_health, simpletrack]
+thresholds: { pv_drop_pct: 30, slow_page_ms: 4000 }
+publisher: { kind: ftp, remote_dir: /web/.../loop }
+escalate_when: [critical_issue_opened]
+escalation: { email: you@example.com }
+```
 
-Nothing is overwritten.  
-Nothing is optimized for trends.  
-Everything compounds.
+## Guardrails — loops amplify judgment
 
----
+Brakes are part of the spec, not bolted on:
 
-## Core Components
+- **Kill switch** — `touch data/KILL` halts the loop; state is persisted, resume is safe
+- **Dry-run** — full reasoning, zero side effects
+- **Budgets** — hard caps per tick (LLM cost, output volume)
+- **Escalation** — declared conditions page a human by email; verification stays human
 
-AIKnowledgeCMS is intentionally split into small, role-specific components.
+## Repository layout
 
-- `aiknowledgecms.php`  
-  Handles CMS-level responsibilities such as:
-  - Data storage
-  - Daily views
-  - Keyword navigation
-  - Manual edits when needed
+```
+loopfile.yaml        # declarative loop definition (one per site)
+core/
+  loop.py            # tick runner: SENSE → TRIAGE → REPORT
+  state.py           # SQLite memory: ticks / observations / issues
+  loopfile.py        # loopfile loader
+adapters/sensors/    # http_health, simpletrack (pluggable)
+playbooks/           # first-class procedures per stage
+systemd/             # hourly timer units
+reports/             # per-tick markdown reports (generated)
+legacy/              # previous AIGM Ecosystem site (pre-framework)
+```
 
-- `daily_summary.php`  
-  Generates structured daily summaries from accumulated knowledge.
+## Dogfooding
 
-- `simpletrack.php`  
-  Provides lightweight, privacy-first, first-party analytics without external dependencies.
+aiknowledgecms.exbridge.jp is the framework's reference deployment.
+The loop that runs this repository publishes its own execution reports at
+[/loop/](https://aiknowledgecms.exbridge.jp/loop/) — the framework's proof is the site itself.
 
-- `aiknowledgecms.py`  
-  Performs AI-assisted processing, including:
-  - Content analysis
-  - Knowledge extraction
-  - Structured JSON generation
+## Roadmap
 
-- `news2audio.py`  
-  Converts accumulated knowledge into audio-ready scripts, enabling optional narration or radio-style output.
-
-This separation keeps knowledge accumulation stable while allowing summary, analytics, and media layers to evolve independently.
-
----
-
-## Screenshot
-
-![AIKnowledgeCMS Screenshot](images/aiknowledgecms.png)
-![AIKnowledgeCMS Screenshot](images/aiknowledgecms_daily.png)
-![AIKnowledgeCMS Screenshot](images/aiknowledge_mobile.jpg)
-
----
-
-## What AIKnowledgeCMS Is NOT
-
-- Not a news aggregator
-- Not an SEO-focused content generator
-- Not a social media automation tool
-- Not designed for virality or volume
-
-AIKnowledgeCMS values **relevance, continuity, and clarity** over reach.
-
----
-
-## Intended Use Cases
-
-AIKnowledgeCMS is suited for:
-
-- Personal knowledge engines
-- Long-term research tracking
-- Domain-focused learning archives
-- Small teams sharing accumulated understanding
-- Systems that require daily structured intelligence snapshots
-
-It works best where **thinking long-term matters more than posting often**.
-
----
-
-## Project Philosophy
-
-AIKnowledgeCMS follows a simple order:
-
-1. Learn continuously
-2. Structure what matters
-3. Generate daily clarity
-4. Let knowledge accumulate naturally
-
-Any outward expression (articles, audio, summaries, media) should be a **byproduct**, not the objective.
-
----
-
-## Runtime Architecture
-
-AIKnowledgeCMS runs as a layered but minimal system:
-
-### Web Layer (PHP)
-- Public browsing & keyword navigation
-- JSON storage (`/data/*.json`)
-- Daily summary rendering
-- Lightweight tracking (`simpletrack.php`)
-- API endpoints for workers and audio upload
-
-### Worker Layer (Python)
-- Autonomous keyword expansion
-- Daily knowledge generation
-- Non-interactive background execution
-
-### Summary Layer
-- Structured daily intelligence snapshots
-- Date-based preservation model
-
-### Optional Media Layer
-- Audio generation (daily summary)
-- Downstream integration (AIRadio, video pipelines, etc.)
-- Media output is strictly downstream
-
----
-
-## Relationship to Other Projects
-
-AIKnowledgeCMS can function independently, but is designed to integrate cleanly with external systems such as:
-
-- AIRadio
-- Script-based audio or video generation pipelines
-- AI-driven live distribution layers
-
-By separating knowledge storage from media execution, the system remains reusable, extensible, and resilient.
-
----
-
-## Status
-
-This project is actively used in a real production environment and continues to evolve.
-
-Current development focuses on:
-
-- Stability of daily knowledge accumulation
-- Refinement of daily summary generation
-- Lightweight, privacy-first tracking
-- Clear separation between knowledge and media layers
-
----
+- **Phase 0** — Concept & spec (done)
+- **Phase 1** — Core tick runner + SENSE / TRIAGE / REPORT ← **you are here**
+- **Phase 2** — CREATE / DISTRIBUTE adapters + quality gates
+- **Phase 3** — ACT via worktrees + shareable growth cards / dashboards
 
 ## License
 
-MIT License
-
+MIT (see LICENSE)

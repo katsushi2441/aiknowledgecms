@@ -1,0 +1,49 @@
+# AIKnowledgeCMS Loopfile — aiknowledgecms.exbridge.jp (参照実装)
+# ループ全体（KPI・ケイデンス・予算・ゲート・エスカレーション）をこの1枚で宣言する。
+
+site: https://aiknowledgecms.exbridge.jp
+env_file: /home/kojima/work/aixec/.env   # FTP_* / SMTP_* を読む(値はコミットしない)
+
+kpi: [pv_24h, uniq_ips_24h, pages_healthy]
+
+cadence:
+  sense: hourly       # systemd timer が起動する(コード側は表示用)
+  create: daily       # Phase 2
+  act: weekly         # Phase 3
+
+# SENSE: 有効なセンサ
+sensors: [http_health, simpletrack]
+
+http_health:
+  watch_pages:
+    - /
+    - /index.html
+    - /aiknowledgecms.html
+    - /aiknowledgesns.php
+    - /sitemap.php
+    - /loop/latest.html
+
+simpletrack:
+  ftp_log_path: /web/aiknowledgecms_exbridge_jp/access.log
+  tail_bytes: 2000000   # 末尾2MBだけFTPで取得して解析(全量DLしない)
+
+# TRIAGE: ルールしきい値
+thresholds:
+  pv_drop_pct: 30        # 前tick比でこの%以上PVが落ちたらissue
+  slow_page_ms: 4000     # 応答がこれより遅いページはissue
+
+# DISTRIBUTE(Phase1はレポート公開のみ)
+publisher:
+  kind: ftp
+  remote_dir: /web/aiknowledgecms_exbridge_jp/loop
+
+# ガードレール
+budgets:
+  llm_cost_per_tick_usd: 0   # Phase 1 はLLM未使用
+escalate_when:
+  - critical_issue_opened    # criticalなissueが新規に開いたらメール
+escalation:
+  email: katsushi2441@gmail.com
+
+# エージェント実行器(Phase 2以降でステージに接続)
+agent_cli: "claude -p"

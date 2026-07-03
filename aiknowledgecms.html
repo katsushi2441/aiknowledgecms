@@ -229,7 +229,7 @@ footer{border-top:1px solid var(--line);background:var(--soft)}
     <a class="btn btn-primary btn-hero" href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">GitHubで見る</a>
     <a class="btn btn-ghost btn-hero" href="#loop">ループの構造を見る ↓</a>
   </div>
-  <span class="phase-pill">⚙ Phase 0 — 構想と仕様を公開中。参照実装はこのサイト自身で構築中。</span>
+  <a class="phase-pill" href="loop/">⚙ Phase 1 — ループ稼働中。毎時のtickレポートを /loop/ で公開 →</a>
 </div>
 
 <!-- ===== THE LOOP ===== -->
@@ -342,8 +342,8 @@ footer{border-top:1px solid var(--line);background:var(--soft)}
     <h2>これからの進み方</h2>
   </div>
   <div class="roadmap">
-    <div class="phase current"><span class="pnum">P0</span><div class="pbody"><h4>構想と仕様<span class="now">いまここ</span></h4><p>マニフェスト、Loopfile仕様、アーキテクチャ。初日から公開。</p></div></div>
-    <div class="phase"><span class="pnum">P1</span><div class="pbody"><h4>コアtickランナー + SENSE / TRIAGE / REPORT</h4><p>実センサ（Search Console・アクセス解析）が課題キューをSQLiteに蓄積。毎tickがループレポートを出力。</p></div></div>
+    <div class="phase"><span class="pnum">P0</span><div class="pbody"><h4>構想と仕様 ✓</h4><p>マニフェスト、Loopfile仕様、アーキテクチャ。初日から公開。</p></div></div>
+    <div class="phase current"><span class="pnum">P1</span><div class="pbody"><h4>コアtickランナー + SENSE / TRIAGE / REPORT<span class="now">いまここ</span></h4><p>実センサが課題キューをSQLiteに蓄積し、毎時のtickが<a href="loop/" style="color:var(--accent)">公開ループレポート</a>を出力——このサイトで現在稼働中。</p></div></div>
     <div class="phase"><span class="pnum">P2</span><div class="pbody"><h4>CREATE / DISTRIBUTE + 品質ゲート</h4><p>ジェネレータ・パブリッシャ・アナウンサを接続し、検証エージェントが全出力をゲート。メディアが育ち始める。</p></div></div>
     <div class="phase"><span class="pnum">P3</span><div class="pbody"><h4>ACT + シェア機能</h4><p>worktree経由でサイト自体を修正するplaybook。診断カード・成長カード・ダッシュボードなど、シェアしたくなる機能。</p></div></div>
   </div>

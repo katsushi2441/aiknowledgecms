@@ -1,0 +1,7 @@
+[Unit]
+Description=AIKnowledgeCMS agent loop tick (SENSE/TRIAGE/REPORT)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/kojima/work/aiknowledgecms
+ExecStart=/usr/bin/python3 -m core.loop
