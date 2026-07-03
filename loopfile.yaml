@@ -77,6 +77,11 @@ announcer:
   kind: aixsns
   api: https://aixec.exbridge.jp/api.php?path=posts
   author: codex
+# 記事公開時に配信するチャネル(上から順に実行・失敗しても他は続行)
+announcers: [aixsns, hatena_blogger, kurage_video]
+# 週次一次データレポート(自DB実測・LLM非使用)
+weekly_report:
+  enabled: true
 
 # ガードレール
 budgets:

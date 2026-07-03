@@ -137,17 +137,55 @@ def maybe_create(cfg: dict, conn, tick_id: int, dry_run: bool,
         return result
 
     from adapters.publishers import articles_ftp
-    from adapters.announcers import aixsns
     url = articles_ftp.publish(cfg, conn, draft, gate)
-    announced = False
-    try:
-        announced = aixsns.announce(cfg, draft["title"], url)
-    except Exception:
-        state.record(conn, tick_id, "create", "announce_error", 1, {})
+    announced = announce_all(cfg, conn, tick_id, draft["title"], url, draft["body"])
     state.record(conn, tick_id, "create", "article_published", 1,
-                 {"slug": draft["slug"], "url": url, "announced": announced})
-    result["published"] = {"title": draft["title"], "url": url, "announced": announced}
+                 {"slug": draft["slug"], "url": url,
+                  "announced": list(announced.keys())})
+    result["published"] = {"title": draft["title"], "url": url,
+                           "announced": announced}
     return result
+
+
+# ---------------------------------------------------------------- announce
+def announce_all(cfg: dict, conn, tick_id: int, title: str, url: str,
+                 body_md: str) -> dict:
+    """loopfileのannouncersに列挙されたチャネルへ配信。失敗しても他は続行。"""
+    from adapters.announcers import aixsns, hatena_blogger, kurage_video
+    channels = {"aixsns": lambda: aixsns.announce(cfg, title, url),
+                "hatena_blogger": lambda: hatena_blogger.announce(cfg, title, url, body_md),
+                "kurage_video": lambda: kurage_video.announce(cfg, title, url, body_md)}
+    results = {}
+    for name in cfg.get("announcers", ["aixsns"]):
+        fn = channels.get(name)
+        if fn is None:
+            continue
+        try:
+            results[name] = fn()
+        except Exception as e:
+            results[name] = {"error": str(e)[:200]}
+        state.record(conn, tick_id, "distribute", f"announce_{name}", 1,
+                     results[name] if isinstance(results[name], dict) else {})
+    conn.commit()
+    return results
+
+
+def maybe_weekly_report(cfg: dict, conn, tick_id: int, dry_run: bool) -> dict | None:
+    """週次の一次データレポート(決定的生成・LLM/ゲート不要)を公開する。"""
+    wr = cfg.get("weekly_report", {})
+    if not wr.get("enabled") or dry_run:
+        return None
+    from adapters.generators import weekly_report
+    if not weekly_report.due(conn):
+        return None
+    from adapters.publishers import articles_ftp
+    draft = weekly_report.generate(cfg, conn, tick_id)
+    gate = {"verifier": {"model": "deterministic(自DB実測)"}}
+    url = articles_ftp.publish(cfg, conn, draft, gate)
+    announced = announce_all(cfg, conn, tick_id, draft["title"], url, draft["body"])
+    state.record(conn, tick_id, "create", "weekly_report_published", 1,
+                 {"url": url, "announced": list(announced.keys())})
+    return {"title": draft["title"], "url": url, "announced": announced}
 
 
 # ---------------------------------------------------------------- report
@@ -182,8 +220,10 @@ def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run, researched=Non
         lines.append("## CREATE / DISTRIBUTE")
         if created.get("published"):
             pub = created["published"]
+            ann = pub.get("announced") or {}
+            ann_s = "/".join(ann.keys()) if isinstance(ann, dict) else str(ann)
             lines.append(f"- ✅ 記事を公開: [{pub['title']}]({pub['url']})"
-                         + (" (AIxSNS告知済み)" if pub.get("announced") else ""))
+                         + (f" (配信: {ann_s})" if ann_s else ""))
         elif created.get("rejected"):
             rej = created["rejected"]
             lines.append(f"- 🛑 ゲート不合格で非公開: {rej['title']}")
@@ -232,11 +272,14 @@ a{{color:#4f46e5;text-decoration:none;font-weight:600}}
 def md_to_simple_html(md: str) -> str:
     out = []
     in_list = False
+    import re as _re
     for line in md.splitlines():
         esc = html.escape(line)
-        # 最小限の整形(見出し・リスト・太字)のみ
+        # 最小限の整形(見出し・リスト・太字・リンク)のみ
         while "**" in esc:
             esc = esc.replace("**", "<strong>", 1).replace("**", "</strong>", 1)
+        esc = _re.sub(r"\[([^\]]+)\]\((https?://[^\s)]+)\)",
+                      r'<a href="\2">\1</a>', esc)
         if esc.startswith("# "):
             out.append(f"<h1>{esc[2:]}</h1>")
         elif esc.startswith("### "):
@@ -406,6 +449,15 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
         print(f"  CREATE: rejected ({created['rejected']['reasons'][:2]})")
     else:
         print(f"  CREATE: skip ({created.get('skipped')})")
+
+    # 週次一次データレポート(期日が来ていれば)
+    try:
+        weekly = maybe_weekly_report(cfg, conn, tick_id, dry_run)
+        if weekly:
+            print(f"  WEEKLY: published {weekly['url']}")
+    except Exception:
+        print("  WEEKLY: FAILED")
+        traceback.print_exc()
 
     # REPORT
     report_md = build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run,
