@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIKnowledgeCMS — 人ではなく、エージェントループが運用するCMS</title>
+<meta name="description" content="AIKnowledgeCMSは、Webサイト成長のためのループエンジニアリング・フレームワーク。AIエージェントが監視・情報収集・課題整理・課題対応・コンテンツ生成・配信を自律的に無限ループし、知識サイトを育てます。">
+<link rel="canonical" href="https://aiknowledgecms.exbridge.jp/aiknowledgecms.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="AIKnowledgeCMS — エージェントループが運用するCMS">
+<meta property="og:description" content="Webサイト成長のためのループエンジニアリング。エージェントが監視→収集→課題整理→対応→生成→配信をループして、サイトが育つ。">
+<meta property="og:url" content="https://aiknowledgecms.exbridge.jp/aiknowledgecms.html">
+<meta name="twitter:card" content="summary">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-BP0650KDFR"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-BP0650KDFR');
+</script>
+<script>
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://aiknowledgecms.exbridge.jp/simpletrack.php'
+        + '?url=' + encodeURIComponent(location.href)
+        + '&ref=' + encodeURIComponent(document.referrer);
+  document.head.appendChild(s);
+})();
+</script>
+<style>
+:root {
+  --bg:#0d1220; --bg2:#111a2e; --panel:rgba(255,255,255,.045); --line:rgba(125,150,220,.22);
+  --ink:#e8edf9; --muted:#9aa8c7; --accent:#6d8dff; --accent2:#38bdf8; --good:#34d399; --gold:#fbbf24;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{color:var(--ink);font-family:"Hiragino Sans","Yu Gothic","Noto Sans JP",Meiryo,sans-serif;
+  background:radial-gradient(1200px 500px at 18% -10%,rgba(109,141,255,.16),transparent 55%),
+             radial-gradient(900px 420px at 95% 0%,rgba(56,189,248,.10),transparent 50%),
+             linear-gradient(170deg,var(--bg) 0%,var(--bg2) 100%);
+  min-height:100vh;overflow-x:hidden;line-height:1.75}
+a{text-decoration:none;color:inherit}
+img{max-width:100%}
+code,pre{font-family:var(--mono)}
+
+header{position:sticky;top:0;z-index:40;background:rgba(13,18,32,.85);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;
+  padding:10px 24px;gap:14px}
+.horynth{flex:0 0 auto;line-height:0}
+.horynth img{height:40px;width:auto;display:block}
+.hbrand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:16px}
+.hbrand .mark{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:16px}
+.hbrand sub{font-size:10.5px;font-weight:700;color:var(--muted);display:block;margin-top:-2px;letter-spacing:.05em}
+.hactions{display:flex;gap:9px;align-items:center}
+.btn{border:0;border-radius:10px;padding:9px 18px;font-weight:800;cursor:pointer;font-size:13.5px;display:inline-flex;align-items:center;gap:7px}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 8px 24px rgba(109,141,255,.35)}
+.btn-ghost{background:transparent;border:1.5px solid var(--line);color:var(--muted)}
+
+.hero{max-width:1060px;margin:0 auto;padding:60px 24px 40px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:var(--panel);border:1.5px solid var(--line);
+  border-radius:999px;padding:7px 14px;font-size:11.5px;font-weight:800;color:var(--accent2);
+  letter-spacing:.12em;text-transform:uppercase;margin-bottom:22px}
+h1{font-size:clamp(28px,4.2vw,52px);font-weight:900;line-height:1.22;letter-spacing:-.02em;margin-bottom:20px;max-width:840px}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{font-size:16px;color:var(--muted);max-width:720px;margin-bottom:28px}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+.btn-hero{border-radius:14px;padding:14px 28px;font-size:15px}
+.phase-pill{display:inline-flex;align-items:center;gap:8px;background:rgba(251,191,36,.1);
+  border:1.5px solid rgba(251,191,36,.4);color:var(--gold);border-radius:999px;padding:7px 14px;
+  font-size:12.5px;font-weight:800}
+
+section{max-width:1060px;margin:0 auto;padding:44px 24px}
+.section-eyebrow{font-size:11.5px;font-weight:800;letter-spacing:.14em;color:var(--accent2);text-transform:uppercase;margin-bottom:10px}
+h2{font-size:clamp(21px,3vw,32px);font-weight:900;letter-spacing:-.02em;margin-bottom:12px}
+.section-lead{font-size:14.5px;color:var(--muted);max-width:680px;margin-bottom:32px}
+
+.loop-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.stage{background:var(--panel);border:1.5px solid var(--line);border-radius:16px;padding:20px}
+.stage .tag{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--accent2);
+  background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);border-radius:6px;
+  padding:3px 8px;display:inline-block;margin-bottom:10px}
+.stage h3{font-size:16px;font-weight:900;margin-bottom:7px}
+.stage p{font-size:13px;color:var(--muted);line-height:1.8}
+.loop-back{grid-column:1/-1;text-align:center;background:rgba(52,211,153,.07);border:1.5px dashed rgba(52,211,153,.4);
+  border-radius:14px;padding:14px;font-size:13.5px;color:var(--good);font-weight:800}
+
+.comp-table{width:100%;border-collapse:collapse;font-size:13.5px}
+.comp-table th,.comp-table td{border:1px solid var(--line);padding:12px 14px;text-align:left;vertical-align:top}
+.comp-table th{background:rgba(109,141,255,.08);color:var(--accent2);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.comp-table td b{color:var(--ink)}
+.comp-table td{color:var(--muted)}
+.table-scroll{overflow-x:auto}
+
+pre{background:#0a0f1c;border:1.5px solid var(--line);border-radius:14px;padding:20px;
+  font-size:12.5px;line-height:1.8;overflow-x:auto;color:#c8d4f0}
+pre .k{color:var(--accent2)}
+pre .v{color:var(--good)}
+pre .c{color:#5b6b8f}
+
+.guards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.guard{background:var(--panel);border:1.5px solid var(--line);border-radius:14px;padding:18px 16px}
+.guard .em{font-size:24px;display:block;margin-bottom:8px}
+.guard h4{font-size:14px;font-weight:900;margin-bottom:5px}
+.guard p{font-size:12px;color:var(--muted);line-height:1.75}
+
+.roadmap{display:grid;gap:10px}
+.phase{display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1.5px solid var(--line);
+  border-radius:14px;padding:16px 18px}
+.phase .pnum{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent2);
+  border:1.5px solid rgba(56,189,248,.4);border-radius:8px;padding:4px 9px;white-space:nowrap;margin-top:2px}
+.phase.current{border-color:rgba(251,191,36,.5);background:rgba(251,191,36,.06)}
+.phase.current .pnum{color:var(--gold);border-color:rgba(251,191,36,.5)}
+.phase h4{font-size:14.5px;font-weight:900;margin-bottom:4px}
+.phase p{font-size:13px;color:var(--muted)}
+
+.dogfood{background:linear-gradient(135deg,rgba(109,141,255,.14),rgba(56,189,248,.08));
+  border:1.5px solid var(--line);border-radius:20px;padding:30px}
+.dogfood h2{margin-bottom:10px}
+.dogfood p{font-size:14px;color:var(--muted);max-width:720px}
+
+footer{border-top:1px solid var(--line);padding:26px 24px;max-width:1060px;margin:20px auto 0}
+.footer-links{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px}
+.footer-links a{font-size:13px;color:var(--muted);font-weight:700}
+.footer-links a:hover{color:var(--accent2)}
+.footer-copy{font-size:12px;color:#5b6b8f}
+
+@media(max-width:820px){
+  .loop-grid{grid-template-columns:1fr}
+  .guards{grid-template-columns:1fr 1fr}
+  .hero{padding:38px 18px 26px}
+  section{padding:32px 18px}
+  header{padding:9px 14px}
+  .horynth img{height:32px}
+  .hactions .btn-ghost{padding:9px 12px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="horynth" href="https://orynth.dev/projects/aiknowledgecms" target="_blank" rel="noopener">
+    <img src="https://orynth.dev/api/badge/aiknowledgecms?theme=light&style=default" alt="Featured on Orynth" width="190" height="60">
+  </a>
+  <a class="hbrand" href="aiknowledgecms.html">
+    <span class="mark">∞</span>
+    <span>AIKnowledgeCMS<sub>AGENT LOOP CMS</sub></span>
+  </a>
+  <div class="hactions">
+    <a class="btn btn-ghost" href="index.html">English</a>
+    <a class="btn btn-primary" href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">GitHub →</a>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<div class="hero">
+  <div class="eyebrow">Loop Engineering for Website Growth</div>
+  <h1>人が運用するCMSではなく、<br><em>エージェントループ</em>が運用するCMS。</h1>
+  <p class="lead">
+    AIKnowledgeCMSは、AIエージェントが知識サイトの上で成長ループを回し続けるオープンなフレームワークです。
+    サイトの状態を監視し、必要な情報を集め、課題を整理し、課題に対応し、
+    コンテンツを生成・配信し、その結果を次の周回に反映する——
+    管理画面の代わりに、ループがあります。
+  </p>
+  <div class="hero-cta">
+    <a class="btn btn-primary btn-hero" href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">GitHubで見る</a>
+    <a class="btn btn-ghost btn-hero" href="#loop">ループの構造を見る</a>
+  </div>
+  <span class="phase-pill">⚙ Phase 0 — 構想と仕様を公開中。参照実装はこのサイト自身で構築中。</span>
+</div>
+
+<!-- ===== THE LOOP ===== -->
+<section id="loop">
+  <div class="section-eyebrow">The Growth Loop</div>
+  <h2>1周（tick）＝6ステージ</h2>
+  <p class="section-lead">
+    暴走する <code>while(true)</code> ではなく、再開可能な「tick」の繰り返しです。
+    スケジューラがtickを起動し、エージェントは手順書（playbook）に従ってステージを進み、結果はすべて計測されて次に引き継がれます。
+  </p>
+  <div class="loop-grid">
+    <div class="stage"><span class="tag">1 · SENSE</span><h3>サイトを監視する</h3><p>アクセス解析・Search Console・アクセスログ・収益・死活を、ループのメモリに構造化された観測値として取り込みます。</p></div>
+    <div class="stage"><span class="tag">2 · RESEARCH</span><h3>情報を収集する</h3><p>トレンド・情報源・競合のシグナルをコレクタアダプタが収集。意思決定の材料になります。</p></div>
+    <div class="stage"><span class="tag">3 · TRIAGE</span><h3>課題を整理する</h3><p>観測値を優先度つきの課題キューに変換。PV下落、インデックスエラー、コンテンツの穴、古くなったページ。</p></div>
+    <div class="stage"><span class="tag">4 · ACT</span><h3>課題に対応する</h3><p>エージェントがplaybookに従って課題を処理。SEO修正やサイト変更は、git worktreeを経由してプルリクエストとして反映します。</p></div>
+    <div class="stage"><span class="tag">5 · CREATE</span><h3>コンテンツを生成する</h3><p>記事・動画・シェアカードを生成。ただし別の検証エージェントによる品質ゲートを通過しない限り、何も公開されません。</p></div>
+    <div class="stage"><span class="tag">6 · DISTRIBUTE</span><h3>配信・告知する</h3><p>パブリッシャ／アナウンサアダプタが、サイト・SNS・動画プラットフォームへ届けます。</p></div>
+    <div class="loop-back">↺ MEASURE — 結果はSENSEに書き戻される。何がサイトを成長させたかをループが学び、次はそれを増やす。</div>
+  </div>
+</section>
+
+<!-- ===== COMPONENTS ===== -->
+<section>
+  <div class="section-eyebrow">Architecture</div>
+  <h2>6つの構成要素、エージェント非依存</h2>
+  <p class="section-lead">
+    エージェントは交換可能です。任意のagent CLI（<code>claude -p</code> / <code>codex exec</code>）がステージ実行器になります。
+    プロダクトの本体はループです。
+  </p>
+  <div class="table-scroll">
+  <table class="comp-table">
+    <tr><th>構成要素</th><th>役割</th></tr>
+    <tr><td><b>Tickとスケジューリング</b></td><td>cron/systemdがケイデンスに従って再開可能なtickを起動（監視は毎時、生成は毎日、対応は毎週など）。状態は永続化され、クラッシュしても安全に再開。</td></tr>
+    <tr><td><b>Playbook（手順書）</b></td><td>手順書はファーストクラスの成果物。エージェントはステージ実行前に必ず手順書を読む——本番での即興を許さない。</td></tr>
+    <tr><td><b>アダプタ</b></td><td>センサ／コレクタ／ジェネレータ／パブリッシャ／アナウンサを差し替え可能に。Search ConsoleをPlausibleに、FTPをGitHub Pagesに。</td></tr>
+    <tr><td><b>品質ゲート</b></td><td>生成者と検証者は別エージェント。事実性・SEOのゲートに落ちたコンテンツは修復または破棄され、黙って公開されることはない。</td></tr>
+    <tr><td><b>メモリ</b></td><td>SQLiteに課題キュー・コンテンツ台帳・メトリクス時系列・意思決定ログを保持。すべて監査可能。</td></tr>
+    <tr><td><b>Worktree</b></td><td>サイトを変更するアクションは隔離されたgit worktreeで実行し、レビュー可能なプルリクエストとして着地。</td></tr>
+  </table>
+  </div>
+</section>
+
+<!-- ===== LOOPFILE ===== -->
+<section>
+  <div class="section-eyebrow">Declarative</div>
+  <h2>サイトごとに1枚の「Loopfile」</h2>
+  <p class="section-lead">KPI・ケイデンス・予算・ゲート・エスカレーション——ループ全体を1つのファイルで宣言します。</p>
+<pre><span class="c"># loopfile.yaml</span>
+<span class="k">site:</span> <span class="v">aiknowledgecms.exbridge.jp</span>
+<span class="k">kpi:</span> [<span class="v">pv_weekly</span>, <span class="v">affiliate_clicks</span>, <span class="v">indexed_pages</span>]
+<span class="k">cadence:</span> { <span class="k">sense:</span> <span class="v">hourly</span>, <span class="k">create:</span> <span class="v">daily</span>, <span class="k">act:</span> <span class="v">weekly</span> }
+<span class="k">budgets:</span> { <span class="k">articles_per_day:</span> <span class="v">3</span>, <span class="k">llm_cost_per_tick_usd:</span> <span class="v">2.0</span> }
+<span class="k">gates:</span> [<span class="v">factuality_check</span>, <span class="v">seo_check</span>]
+<span class="k">escalate_when:</span> [<span class="v">revenue_drop_30pct</span>, <span class="v">index_errors</span>]
+<span class="k">adapters:</span>
+  <span class="k">sensors:</span> [<span class="v">gsc</span>, <span class="v">simpletrack</span>]
+  <span class="k">publisher:</span> <span class="v">ftp_heteml</span>
+  <span class="k">announcer:</span> <span class="v">aixsns</span></pre>
+</section>
+
+<!-- ===== GUARDRAILS ===== -->
+<section>
+  <div class="section-eyebrow">Loop Engineering</div>
+  <h2>ループは判断を増幅する——だからブレーキは仕様の一部</h2>
+  <p class="section-lead">ガードレールのない自律無限ループは資産ではなく負債です。後付けではなく、最初から組み込みます。</p>
+  <div class="guards">
+    <div class="guard"><span class="em">💰</span><h4>予算上限</h4><p>tickあたりのLLMコスト・記事数・API呼び出しに絶対上限。財布より先にループが止まる。</p></div>
+    <div class="guard"><span class="em">🧪</span><h4>Dry-run</h4><p>全ステージが副作用ゼロで実行可能。推論の中身を監査してから信頼する。</p></div>
+    <div class="guard"><span class="em">🛑</span><h4>Kill switch</h4><p>フラグ1つでループ全停止。状態は永続化されているので再開も安全。</p></div>
+    <div class="guard"><span class="em">🙋</span><h4>エスカレーション</h4><p>宣言した条件で人間に通知（メール／LINE）。検証は人間の責任のまま。</p></div>
+  </div>
+</section>
+
+<!-- ===== DOGFOOD ===== -->
+<section>
+  <div class="dogfood">
+    <div class="section-eyebrow">Dogfooding</div>
+    <h2>このサイト自身が参照実装</h2>
+    <p>
+      aiknowledgecms.exbridge.jp は、このフレームワークの最初のインスタンスとして再構築中です。
+      AIエージェント経済をテーマにした実証メディアを、ループ自身が記事・動画・シェアカード・収益まで
+      生成・計測し、毎tickのレポートを公開します。フレームワークの証明は、あなたが今読んでいるこのサイトです。
+    </p>
+  </div>
+</section>
+
+<!-- ===== ROADMAP ===== -->
+<section>
+  <div class="section-eyebrow">Roadmap</div>
+  <h2>これからの進み方</h2>
+  <div class="roadmap">
+    <div class="phase current"><span class="pnum">Phase 0</span><div><h4>構想と仕様 — いまここ</h4><p>マニフェスト、Loopfile仕様、アーキテクチャ。初日から公開。</p></div></div>
+    <div class="phase"><span class="pnum">Phase 1</span><div><h4>コアtickランナー + SENSE / TRIAGE / REPORT</h4><p>実センサ（Search Console・アクセス解析）が課題キューをSQLiteに蓄積。毎tickがループレポートを出力。</p></div></div>
+    <div class="phase"><span class="pnum">Phase 2</span><div><h4>CREATE / DISTRIBUTE + 品質ゲート</h4><p>ジェネレータ・パブリッシャ・アナウンサを接続し、検証エージェントが全出力をゲート。メディアが育ち始める。</p></div></div>
+    <div class="phase"><span class="pnum">Phase 3</span><div><h4>ACT + シェア機能</h4><p>worktree経由でサイト自体を修正するplaybook。診断カード・成長カード・ダッシュボードなど、シェアしたくなる機能。</p></div></div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-links">
+    <a href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">GitHub</a>
+    <a href="index.html">English</a>
+    <a href="airadarx.php">AIRadarX (legacy)</a>
+    <a href="aiknowledgesns.php">AIKnowledgeSNS</a>
+    <a href="https://kurage.exbridge.jp/">Kurage Project</a>
+    <a href="https://www.orynth.dev/@bittensorman" target="_blank" rel="noopener">Orynth</a>
+    <a href="https://x.com/xb_bittensor" target="_blank" rel="noopener">X @xb_bittensor</a>
+    <a href="https://medium.com/@kojima_99110" target="_blank" rel="noopener">Medium</a>
+    <a href="sitemap.php">Sitemap</a>
+  </div>
+  <div class="footer-copy">© 2026 EXBRIDGE, Inc. All rights reserved. — 当サイトはAmazonアソシエイト・プログラムに参加しています。</div>
+</footer>
+</body>
+</html>

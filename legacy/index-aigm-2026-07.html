@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<title>AIKnowledgeCMS — AIGM Ecosystem | AIRadarX · AIKnowledgeSNS</title>
+<meta name="description" content="AIGM Ecosystem: AI autonomously generates, accumulates, and distributes knowledge. AIRadarX for X account diagnosis & shadowban check. AIKnowledgeSNS — an AI-powered SNS where keyword proximity connects people. Monetize with Amazon Associates.">
+<meta name="keywords" content="AIRadarX,shadowban check,X account diagnosis,AIKnowledgeSNS,AI SNS,Amazon Associates,AIKnowledgeCMS,AIGM">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="https://aiknowledgecms.exbridge.jp/">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="AIKnowledgeCMS — AIGM Ecosystem">
+<meta property="og:description" content="AI autonomously generates, accumulates, and distributes knowledge. AIRadarX · AIKnowledgeSNS · AIKnowledgeCMS.">
+<meta property="og:url" content="https://aiknowledgecms.exbridge.jp/">
+<meta property="og:image" content="https://aiknowledgecms.exbridge.jp/images/aiknowledgecms_logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AIKnowledgeCMS — AIGM Ecosystem">
+<meta name="twitter:description" content="AI autonomously generates, accumulates, and distributes knowledge. AIRadarX · AIKnowledgeSNS · AIKnowledgeCMS.">
+<meta name="twitter:image" content="https://aiknowledgecms.exbridge.jp/images/aiknowledgecms_logo.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "AIKnowledgeCMS AIGM Ecosystem",
+  "url": "https://aiknowledgecms.exbridge.jp/",
+  "description": "AI autonomously generates, accumulates, and distributes knowledge media infrastructure.",
+  "creator": {"@type": "Organization", "name": "EXBRIDGE, Inc."}
+}
+</script>
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-BP0650KDFR"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-BP0650KDFR');
+</script>
+<script>
+(function(){
+  var s = document.createElement('script');
+  s.src = 'https://aiknowledgecms.exbridge.jp/simpletrack.php'
+        + '?url=' + encodeURIComponent(location.href)
+        + '&ref=' + encodeURIComponent(document.referrer);
+  document.head.appendChild(s);
+})();
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;700;800&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg:     #0d1117;
+  --bg2:    #161b22;
+  --bg3:    #1c2333;
+  --blue:   #58a6ff;
+  --green:  #3fb950;
+  --gold:   #d29922;
+  --pink:   #f778ba;
+  --text:   #e6edf3;
+  --text2:  #8b949e;
+  --text3:  #6e7681;
+  --border: rgba(240,246,252,.1);
+  --border2:rgba(240,246,252,.06);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  line-height: 1.7;
+  overflow-x: hidden;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+a { color: var(--blue); text-decoration: none; }
+
+/* HEADER */
+.site-header {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0;
+  background: rgba(13,17,23,.95);
+  backdrop-filter: blur(12px);
+  z-index: 100;
+}
+.site-header .container { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.site-logo { font-family: 'Share Tech Mono', monospace; font-size: .82rem; color: var(--blue); letter-spacing: .1em; }
+.site-nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.site-nav a {
+  font-family: 'Share Tech Mono', monospace; font-size: .68rem;
+  color: var(--text2); padding: 6px 12px;
+  border-radius: 6px; transition: all .15s; letter-spacing: .03em;
+}
+.site-nav a:hover { color: var(--text); background: var(--bg2); }
+.site-nav a.g:hover { color: var(--green); }
+
+/* HERO */
+.hero {
+  min-height: 88vh;
+  display: flex; align-items: center;
+  position: relative; overflow: hidden;
+  background: linear-gradient(180deg, #0d1117 0%, #0d1117 60%, #0a0f14 100%);
+}
+.hero-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 0% 50%, rgba(88,166,255,.08) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 60% at 100% 10%, rgba(63,185,80,.06) 0%, transparent 45%);
+}
+.hero-content { position: relative; z-index: 1; padding: 80px 0 100px; max-width: 760px; }
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'Share Tech Mono', monospace; font-size: .68rem;
+  color: var(--blue); letter-spacing: .2em; margin-bottom: 24px;
+  background: rgba(88,166,255,.08); border: 1px solid rgba(88,166,255,.2);
+  padding: 5px 14px; border-radius: 20px;
+}
+.hero-eyebrow::before { content: '◉'; font-size: .5rem; }
+.hero-title {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(2.8rem, 6.5vw, 5rem);
+  font-weight: 800; line-height: 1.08;
+  letter-spacing: -.02em; margin-bottom: 16px;
+  color: var(--text);
+}
+.t-blue  { color: var(--blue); }
+.t-green { color: var(--green); }
+.t-gold  { color: var(--gold); }
+.hero-sub {
+  font-family: 'Share Tech Mono', monospace; font-size: .76rem;
+  color: var(--text3); letter-spacing: .1em; margin-bottom: 24px;
+}
+.hero-desc {
+  font-size: 1rem; color: var(--text2);
+  max-width: 560px; margin-bottom: 40px; line-height: 1.85;
+}
+.hero-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn-primary {
+  font-family: 'Share Tech Mono', monospace; font-size: .76rem; letter-spacing: .06em;
+  padding: 10px 22px;
+  background: var(--green); color: #0d1117;
+  border: 1px solid var(--green);
+  border-radius: 6px; font-weight: 700;
+  text-decoration: none; transition: all .15s; cursor: pointer;
+}
+.btn-primary.b { background: var(--blue); border-color: var(--blue); }
+.btn-primary:hover { opacity: .88; transform: translateY(-1px); box-shadow: 0 4px 16px rgba(63,185,80,.3); }
+.btn-primary.b:hover { box-shadow: 0 4px 16px rgba(88,166,255,.3); }
+.btn-outline {
+  font-family: 'Share Tech Mono', monospace; font-size: .76rem; letter-spacing: .06em;
+  padding: 10px 22px; background: var(--bg2); color: var(--text2);
+  border: 1px solid var(--border); border-radius: 6px;
+  text-decoration: none; transition: all .15s;
+}
+.btn-outline:hover { border-color: rgba(240,246,252,.25); color: var(--text); }
+
+/* DIVIDER */
+.divider { height: 1px; background: var(--border); }
+
+/* SECTIONS */
+.section { padding: 80px 0; }
+.section-label {
+  font-family: 'Share Tech Mono', monospace; font-size: .62rem;
+  letter-spacing: .25em; color: var(--text3); margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.section-title {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  font-weight: 700; line-height: 1.2; margin-bottom: 12px;
+  color: var(--text);
+}
+.section-desc { color: var(--text2); max-width: 620px; font-size: .94rem; line-height: 1.8; }
+
+/* FLOW */
+.flow-section {
+  padding: 80px 0;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.flow-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 1px; margin-top: 48px;
+  background: var(--border); border-radius: 8px; overflow: hidden;
+}
+.flow-step {
+  padding: 28px 24px; text-align: left;
+  background: var(--bg2); position: relative;
+  transition: background .2s;
+}
+.flow-step:hover { background: var(--bg3); }
+.flow-num {
+  font-family: 'Share Tech Mono', monospace; font-size: .72rem;
+  color: var(--text3); font-weight: 700; display: block; margin-bottom: 12px;
+  letter-spacing: .1em;
+}
+.flow-name { font-family: 'Syne', sans-serif; font-size: .95rem; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.flow-desc { font-size: .8rem; color: var(--text2); line-height: 1.7; }
+.flow-tag {
+  display: inline-block; margin-top: 12px;
+  font-family: 'Share Tech Mono', monospace; font-size: .6rem;
+  letter-spacing: .1em; padding: 3px 8px; border-radius: 4px;
+}
+.ft-g { background: rgba(63,185,80,.12); color: var(--green); border: 1px solid rgba(63,185,80,.25); }
+.ft-b { background: rgba(88,166,255,.12); color: var(--blue); border: 1px solid rgba(88,166,255,.25); }
+.ft-o { background: rgba(210,153,34,.12); color: var(--gold); border: 1px solid rgba(210,153,34,.25); }
+.ft-p { background: rgba(247,120,186,.12); color: var(--pink); border: 1px solid rgba(247,120,186,.25); }
+
+/* PRODUCT GRID */
+.product-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px; margin-top: 48px;
+}
+.product-card {
+  background: var(--bg2); padding: 28px 28px 24px;
+  position: relative; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 10px;
+  transition: border-color .2s, transform .2s;
+}
+.product-card:hover { border-color: rgba(240,246,252,.2); transform: translateY(-2px); }
+.pc-g:hover { border-color: rgba(63,185,80,.35); }
+.pc-b:hover { border-color: rgba(88,166,255,.35); }
+.pc-o:hover { border-color: rgba(210,153,34,.35); }
+.product-tag {
+  font-family: 'Share Tech Mono', monospace; font-size: .6rem; letter-spacing: .15em;
+  padding: 3px 9px; border-radius: 4px; display: inline-block; margin-bottom: 14px;
+}
+.tg-g { background: rgba(63,185,80,.12); color: var(--green); border: 1px solid rgba(63,185,80,.25); }
+.tg-b { background: rgba(88,166,255,.12); color: var(--blue); border: 1px solid rgba(88,166,255,.25); }
+.tg-o { background: rgba(210,153,34,.12); color: var(--gold); border: 1px solid rgba(210,153,34,.25); }
+.product-name { font-family: 'Syne', sans-serif; font-size: 1.35rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.product-catch { font-family: 'Share Tech Mono', monospace; font-size: .68rem; color: var(--text3); letter-spacing: .04em; margin-bottom: 12px; }
+.product-desc { font-size: .86rem; color: var(--text2); line-height: 1.75; margin-bottom: 18px; }
+.product-feats { list-style: none; margin-bottom: 22px; }
+.product-feats li {
+  font-size: .82rem; color: var(--text2);
+  padding: 6px 0 6px 16px; border-bottom: 1px solid var(--border2);
+  position: relative;
+}
+.product-feats li::before { content: '·'; position: absolute; left: 0; color: var(--text3); font-size: 1.2rem; line-height: 1.4; }
+.product-link {
+  font-family: 'Share Tech Mono', monospace; font-size: .7rem; letter-spacing: .08em;
+  padding: 8px 16px; border-radius: 6px; display: inline-block; transition: all .15s;
+}
+.pl-g { background: rgba(63,185,80,.1); color: var(--green); border: 1px solid rgba(63,185,80,.25); }
+.pl-g:hover { background: rgba(63,185,80,.2); }
+.pl-b { background: rgba(88,166,255,.1); color: var(--blue); border: 1px solid rgba(88,166,255,.25); }
+.pl-b:hover { background: rgba(88,166,255,.2); }
+.pl-o { background: rgba(210,153,34,.1); color: var(--gold); border: 1px solid rgba(210,153,34,.25); }
+.pl-o:hover { background: rgba(210,153,34,.2); }
+
+/* ASSOCIATE */
+.assoc-box {
+  margin-top: 48px;
+  background: var(--bg2);
+  border: 1px solid rgba(210,153,34,.2);
+  border-radius: 10px; padding: 40px 40px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: start;
+}
+.assoc-label { font-family: 'Share Tech Mono', monospace; font-size: .6rem; letter-spacing: .25em; color: var(--gold); margin-bottom: 8px; }
+.assoc-title { font-family: 'Syne', sans-serif; font-size: 1.45rem; font-weight: 700; color: var(--text); margin-bottom: 12px; line-height: 1.3; }
+.assoc-desc { font-size: .88rem; color: var(--text2); line-height: 1.8; margin-bottom: 20px; }
+.assoc-steps { list-style: none; }
+.assoc-steps li {
+  font-size: .84rem; color: var(--text2);
+  padding: 10px 0; border-bottom: 1px solid var(--border2);
+  display: flex; gap: 12px; align-items: flex-start; line-height: 1.6;
+}
+.assoc-steps li strong { color: var(--gold); font-family: 'Share Tech Mono', monospace; font-size: .7rem; flex-shrink: 0; margin-top: 2px; }
+
+/* SCREENS */
+.screens {
+  display: flex; gap: 16px; overflow-x: auto;
+  scroll-snap-type: x mandatory; padding-bottom: 8px; margin-top: 40px;
+}
+.screens::-webkit-scrollbar { height: 3px; }
+.screens::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.screen-card {
+  min-width: 300px; max-width: 300px; flex-shrink: 0; scroll-snap-align: start;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+  transition: border-color .2s;
+}
+.screen-card:hover { border-color: rgba(240,246,252,.2); }
+.screen-img { height: 190px; overflow: hidden; background: var(--bg3); }
+.screen-img img { width: 100%; height: 100%; object-fit: cover; transition: transform .4s; }
+.screen-card:hover .screen-img img { transform: scale(1.04); }
+.screen-body { padding: 16px 18px; }
+.screen-name { font-family: 'Share Tech Mono', monospace; font-size: .72rem; color: var(--blue); margin-bottom: 5px; letter-spacing: .04em; }
+.screen-desc { font-size: .8rem; color: var(--text2); line-height: 1.65; }
+
+/* FOOTER */
+.site-footer { padding: 60px 0; border-top: 1px solid var(--border); background: var(--bg2); }
+.footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+.footer-brand { font-family: 'Share Tech Mono', monospace; font-size: .82rem; color: var(--blue); letter-spacing: .1em; margin-bottom: 12px; }
+.footer-tagline { font-size: .84rem; color: var(--text2); line-height: 1.8; }
+.footer-col-title { font-family: 'Share Tech Mono', monospace; font-size: .62rem; letter-spacing: .18em; color: var(--text3); margin-bottom: 12px; text-transform: uppercase; }
+.footer-links { list-style: none; }
+.footer-links li { margin-bottom: 8px; }
+.footer-links a { font-size: .84rem; color: var(--text2); transition: color .15s; }
+.footer-links a:hover { color: var(--blue); }
+.footer-bottom {
+  border-top: 1px solid var(--border); padding-top: 20px;
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+}
+.footer-copy { font-family: 'Share Tech Mono', monospace; font-size: .65rem; color: var(--text3); letter-spacing: .04em; }
+.footer-assoc { font-size: .72rem; color: var(--text3); max-width: 480px; text-align: right; line-height: 1.6; }
+
+/* ANIMATIONS */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hero-content > * { animation: fade-up .6s ease both; }
+.hero-content > *:nth-child(1) { animation-delay: .05s; }
+.hero-content > *:nth-child(2) { animation-delay: .12s; }
+.hero-content > *:nth-child(3) { animation-delay: .2s; }
+.hero-content > *:nth-child(4) { animation-delay: .28s; }
+.hero-content > *:nth-child(5) { animation-delay: .36s; }
+.hero-content > *:nth-child(6) { animation-delay: .44s; }
+
+@media (max-width: 900px) {
+  .product-grid { grid-template-columns: 1fr; }
+  .flow-grid { grid-template-columns: 1fr 1fr; }
+  .assoc-box { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .flow-grid { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="container">
+    <a href="/" class="site-logo">AIKnowledgeCMS</a>
+    <nav class="site-nav">
+      <a href="airadarx.php" class="g">AIRadarX</a>
+      <a href="aiknowledgesns.php">AIKnowledgeSNS</a>
+      <a href="aiknowledgecms.php">CMS</a>
+      <a href="daily_summary.php">Daily</a>
+      <a href="https://github.com/katsushi2441/aiknowledgecms" target="_blank">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="container">
+    <div class="hero-content">
+      <div>
+        <a href="https://orynth.dev/projects/aiknowledgecms" target="_blank" rel="noopener">
+          <img src="https://orynth.dev/api/badge/aiknowledgecms?theme=light&style=default" alt="Featured on Orynth" width="190" height="60" />
+        </a>
+      </div>
+      <div class="hero-eyebrow">AIGM ECOSYSTEM — AI GENERATED MEDIA</div>
+      <h1 class="hero-title">
+        AI that <span class="t-green">grows</span>,<br>
+        <span class="t-blue">connects</span>,<br>
+        and <span class="t-gold">earns</span>.
+      </h1>
+      <div class="hero-sub">AIKnowledgeCMS · AIRadarX · AIKnowledgeSNS</div>
+      <p class="hero-desc">
+        A self-evolving AI media ecosystem built by a solo developer.<br>
+        AI collects knowledge, SNS connects people by keyword proximity,<br>
+        and Amazon Associates turns attention into revenue — automatically.
+      </p>
+      <div class="hero-btns">
+        <a href="airadarx.php" class="btn-primary g">Try AIRadarX →</a>
+        <a href="aiknowledgesns.php" class="btn-outline">AIKnowledgeSNS</a>
+        <a href="aiknowledgecms.php" class="btn-outline">AIKnowledgeCMS</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- HERO IMAGE -->
+<div style="text-align:center;padding:60px 24px 0;position:relative;z-index:1;">
+  <img src="https://aiknowledgecms.exbridge.jp/images/knowradar.png"
+       alt="AIKnowledgeCMS AIGM Ecosystem Overview"
+       style="max-width:90%;width:960px;border-radius:8px;
+              box-shadow:0 0 80px rgba(0,170,255,.18), 0 0 1px rgba(0,170,255,.3);
+              border:1px solid rgba(0,170,255,.12);">
+</div>
+
+<div class="divider" style="margin-top:60px;"></div>
+
+<!-- FLOW -->
+<section class="flow-section">
+  <div class="container">
+    <div class="section-label">HOW IT WORKS</div>
+    <h2 class="section-title">The AIGM Loop</h2>
+    <p class="section-desc">Four stages working together — scan, connect, accumulate, earn. Each feeds the next.</p>
+    <div class="flow-grid">
+      <div class="flow-step">
+        <span class="flow-num">01</span>
+        <div class="flow-name">AIRadarX</div>
+        <div class="flow-desc">Scan your X account. Shadowban diagnosis, AI keyword extraction, news radar, post draft generation.</div>
+        <span class="flow-tag ft-g">X ANALYZER</span>
+      </div>
+      <div class="flow-step">
+        <span class="flow-num">02</span>
+        <div class="flow-name">AIKnowledgeSNS</div>
+        <div class="flow-desc">Discover X accounts by keyword proximity — not follower count. Knowledge graph over social graph.</div>
+        <span class="flow-tag ft-b">AI SNS</span>
+      </div>
+      <div class="flow-step">
+        <span class="flow-num">03</span>
+        <div class="flow-name">AIKnowledgeCMS</div>
+        <div class="flow-desc">AI auto-collects news, generates analysis, and archives knowledge by keyword — growing every day.</div>
+        <span class="flow-tag ft-o">KNOWLEDGE ENGINE</span>
+      </div>
+      <div class="flow-step">
+        <span class="flow-num">04</span>
+        <div class="flow-name">Revenue Loop</div>
+        <div class="flow-desc">Register your Amazon Associates ID. Relevant ads appear on your profile. Visitors buy. You earn.</div>
+        <span class="flow-tag ft-p">MONETIZE</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- PRODUCTS -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">PRODUCTS</div>
+    <h2 class="section-title">Three tools. One ecosystem.</h2>
+    <p class="section-desc">Each product is independently useful — and exponentially more powerful together.</p>
+    <div class="product-grid">
+
+      <div class="product-card pc-g">
+        <span class="product-tag tg-g">X ANALYZER</span>
+        <div class="product-name">AIRadarX</div>
+        <div class="product-catch">Shadowban Check · X Account Diagnosis</div>
+        <p class="product-desc">Multi-angle X account diagnosis. Shadowban detection, AI keyword extraction, real-time news collection, and automatic post draft generation — all in one.</p>
+        <ul class="product-feats">
+          <li>Shadowban & account health diagnosis</li>
+          <li>AI extracts keywords from your profile & posts</li>
+          <li>Real-time news collection by keyword</li>
+          <li>AI analyzes news and drafts X posts</li>
+          <li>Seamless link to AIKnowledgeSNS</li>
+        </ul>
+        <a href="airadarx.php" class="product-link pl-g">→ Open AIRadarX</a>
+      </div>
+
+      <div class="product-card pc-b">
+        <span class="product-tag tg-b">AI SNS</span>
+        <div class="product-name">AIKnowledgeSNS</div>
+        <div class="product-catch">Keyword Proximity · Next-gen X Support</div>
+        <p class="product-desc">An AI SNS that recommends accounts by keyword closeness rather than follower count. Register your Amazon Associates ID — ads appear automatically and revenue flows to you.</p>
+        <ul class="product-feats">
+          <li>Discover X accounts by keyword graph</li>
+          <li>Share AIKnowledgeCMS insights on SNS</li>
+          <li>Likes create a natural path to X follows</li>
+          <li>Amazon Associates ID → auto ad display</li>
+          <li>Visitors purchase → revenue goes to you</li>
+        </ul>
+        <a href="aiknowledgesns.php" class="product-link pl-b">→ Open AIKnowledgeSNS</a>
+      </div>
+
+      <div class="product-card pc-o">
+        <span class="product-tag tg-o">KNOWLEDGE ENGINE</span>
+        <div class="product-name">AIKnowledgeCMS</div>
+        <div class="product-catch">Self-Growing · AI Knowledge Archive</div>
+        <p class="product-desc">AI auto-collects, analyzes, and archives knowledge by keyword every day. Not built for virality — built for long-term continuity and deep understanding.</p>
+        <ul class="product-feats">
+          <li>AI collects & analyzes news daily</li>
+          <li>Keyword graph structures knowledge</li>
+          <li>Daily AI summaries capture intelligence</li>
+          <li>Trend engine auto-expands coverage</li>
+          <li>Open source — fully customizable</li>
+        </ul>
+        <a href="aiknowledgecms.php" class="product-link pl-o">→ Open CMS</a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- AMAZON ASSOCIATES -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">MONETIZATION</div>
+    <h2 class="section-title">Earn with Amazon Associates</h2>
+    <p class="section-desc">AIKnowledgeSNS has monetization built in. Your profile page becomes a revenue channel.</p>
+    <div class="assoc-box">
+      <div>
+        <div class="assoc-label">HOW TO EARN</div>
+        <div class="assoc-title">Register your ID.<br>Ads appear automatically.</div>
+        <p class="assoc-desc">
+          If you have an Amazon Associates account, just enter your ID in your AIKnowledgeSNS profile page. Keyword-relevant Amazon products will automatically appear as ads on your page. When visitors purchase, the commission goes to you.
+        </p>
+        <a href="aiknowledgesns.php" class="product-link pl-o">→ Set up on My Page</a>
+      </div>
+      <div>
+        <ul class="assoc-steps">
+          <li><strong>01</strong> &nbsp; Scan your X account with AIRadarX to extract keywords</li>
+          <li><strong>02</strong> &nbsp; Log in to AIKnowledgeSNS with your X account</li>
+          <li><strong>03</strong> &nbsp; Enter your Amazon Associates ID on your profile page</li>
+          <li><strong>04</strong> &nbsp; Keyword-relevant Amazon products appear as ads automatically</li>
+          <li><strong>05</strong> &nbsp; Visitors click & purchase → commission is yours</li>
+          <li><strong>※</strong> &nbsp; Register aiknowledgecms.exbridge.jp in Amazon Associates dashboard</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- SCREENSHOTS -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">INTERFACE</div>
+    <h2 class="section-title">See it in action</h2>
+    <div class="screens">
+      <div class="screen-card">
+        <div class="screen-img"><a href="https://aiknowledgecms.exbridge.jp/images/airadarx.png" target="_blank"><img src="https://aiknowledgecms.exbridge.jp/images/airadarx.png" alt="AIRadarX"></a></div>
+        <div class="screen-body">
+          <div class="screen-name">AIRadarX</div>
+          <div class="screen-desc">X account diagnosis hub. Shadowban check, AI keyword extraction, news radar, post draft generation.</div>
+        </div>
+      </div>
+      <div class="screen-card">
+        <div class="screen-img"><a href="https://aiknowledgecms.exbridge.jp/images/aiknowledgesns.png" target="_blank"><img src="https://aiknowledgecms.exbridge.jp/images/aiknowledgesns.png" alt="AIKnowledgeSNS"></a></div>
+        <div class="screen-body">
+          <div class="screen-name">AIKnowledgeSNS</div>
+          <div class="screen-desc">AI SNS connecting people by keyword proximity. Amazon Associates monetization built in.</div>
+        </div>
+      </div>
+      <div class="screen-card">
+        <div class="screen-img"><a href="images/aiknowledgecms.png" target="_blank"><img src="images/aiknowledgecms.png" alt="AIKnowledgeCMS"></a></div>
+        <div class="screen-body">
+          <div class="screen-name">AIKnowledgeCMS</div>
+          <div class="screen-desc">Knowledge archive organized by keyword and date, growing daily.</div>
+        </div>
+      </div>
+      <div class="screen-card">
+        <div class="screen-img"><a href="images/aiknowledgecms_daily.png" target="_blank"><img src="images/aiknowledgecms_daily.png" alt="Daily Summary"></a></div>
+        <div class="screen-body">
+          <div class="screen-name">Daily AI Summary</div>
+          <div class="screen-desc">Structured daily intelligence snapshot generated by AI.</div>
+        </div>
+      </div>
+      <div class="screen-card">
+        <div class="screen-img"><a href="images/aitrend.png" target="_blank"><img src="images/aitrend.png" alt="AI Trend"></a></div>
+        <div class="screen-body">
+          <div class="screen-name">AI Trend Expansion</div>
+          <div class="screen-desc">Detects emerging keywords and auto-expands the knowledge base.</div>
+        </div>
+      </div>
+      <div class="screen-card">
+        <div class="screen-img"><a href="images/simpletrack.png" target="_blank"><img src="images/simpletrack.png" alt="Analytics"></a></div>
+        <div class="screen-body">
+          <div class="screen-name">Privacy-first Analytics</div>
+          <div class="screen-desc">Lightweight built-in tracking. No third-party dependencies.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- LIVE DEMO -->
+<section class="section">
+  <div class="container">
+    <div class="section-label">LIVE DEMO</div>
+    <h2 class="section-title">AIKnowledgeCMS — Live Preview</h2>
+    <p class="section-desc">A live preview of the running knowledge archive.</p>
+    <div style="margin-top:36px;border-radius:6px;overflow:hidden;border:1px solid rgba(0,170,255,.12);">
+      <iframe src="aiknowledgecms.php" style="width:100%;height:660px;border:0;background:#020617;" loading="lazy"></iframe>
+    </div>
+    <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">
+      <a href="daily_summary.php" class="btn-outline">Daily Summary →</a>
+      <a href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" class="btn-outline">GitHub →</a>
+    </div>
+  </div>
+</section>
+
+<div class="divider"></div>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <div class="footer-brand">AIKnowledgeCMS</div>
+        <p class="footer-tagline">
+          A self-evolving AI media ecosystem.<br>
+          Built by a solo developer in Japan.<br>
+          AI generates. SNS connects. Associates earn.
+        </p>
+      </div>
+      <div>
+        <div class="footer-col-title">PRODUCTS</div>
+        <ul class="footer-links">
+          <li><a href="airadarx.php">AIRadarX</a></li>
+          <li><a href="aiknowledgesns.php">AIKnowledgeSNS</a></li>
+          <li><a href="aiknowledgecms.php">AIKnowledgeCMS</a></li>
+          <li><a href="daily_summary.php">Daily Summary</a></li>
+        </ul>
+      </div>
+      <div>
+        <div class="footer-col-title">LINKS</div>
+        <ul class="footer-links">
+          <li><a href="https://github.com/katsushi2441/aiknowledgecms" target="_blank">GitHub</a></li>
+          <li><a href="https://www.orynth.dev/@bittensorman" target="_blank">Orynth</a></li>
+          <li><a href="https://x.com/xb_bittensor" target="_blank">X @xb_bittensor</a></li>
+          <li><a href="https://medium.com/@kojima_99110" target="_blank">Medium</a></li>
+          <li><a href="sitemap.php">Sitemap</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="footer-copy">(c) 2026 EXBRIDGE, Inc. All rights reserved.</div>
+      <div class="footer-assoc">This site participates in the Amazon Associates Program. Product links may contain affiliate links.</div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
