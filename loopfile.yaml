@@ -48,6 +48,7 @@ http_health:
     - /aiknowledgesns.php
     - /sitemap.php
     - /loop/latest.html
+    - /articles/
 
 simpletrack:
   ftp_log_path: /web/aiknowledgecms_exbridge_jp/access.log

@@ -238,6 +238,10 @@ def md_to_simple_html(md: str) -> str:
             esc = esc.replace("**", "<strong>", 1).replace("**", "</strong>", 1)
         if esc.startswith("# "):
             out.append(f"<h1>{esc[2:]}</h1>")
+        elif esc.startswith("### "):
+            if in_list:
+                out.append("</ul>"); in_list = False
+            out.append(f"<h3>{esc[4:]}</h3>")
         elif esc.startswith("## "):
             if in_list:
                 out.append("</ul>"); in_list = False
@@ -324,10 +328,31 @@ def escalate(cfg: dict, opened: list[dict]) -> bool:
 
 
 # ---------------------------------------------------------------- tick
+LOCK = ROOT / "data" / "LOCK"
+
+
+def _acquire_lock() -> bool:
+    LOCK.parent.mkdir(exist_ok=True)
+    if LOCK.exists():
+        try:
+            pid = int(LOCK.read_text().strip())
+            import os
+            os.kill(pid, 0)  # 生存確認
+            return False     # 実行中のtickがいる
+        except (ValueError, ProcessLookupError, PermissionError):
+            pass             # 死んだプロセスのロックは奪う
+    import os
+    LOCK.write_text(str(os.getpid()))
+    return True
+
+
 def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
     if KILL.exists():
         print("KILL switch present — loop halted. (data/KILL を削除すると再開)")
         return 2
+    if not _acquire_lock():
+        print("別のtickが実行中のためスキップ (data/LOCK)")
+        return 3
 
     conn = state.connect()
     tick_id = state.begin_tick(conn, dry_run)
@@ -364,8 +389,16 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
     triaged = triage(cfg, conn, tick_id, sensed)
     print(f"  TRIAGE: opened={len(triaged['opened'])} resolved={len(triaged['resolved'])}")
 
-    # CREATE → ゲート → DISTRIBUTE
-    created = maybe_create(cfg, conn, tick_id, dry_run, force=force_create)
+    # CREATE → ゲート → DISTRIBUTE (失敗してもtickは完走させる)
+    try:
+        created = maybe_create(cfg, conn, tick_id, dry_run, force=force_create)
+    except Exception:
+        print("  CREATE: FAILED")
+        traceback.print_exc()
+        state.record(conn, tick_id, "create", "create_error", 1,
+                     {"error": traceback.format_exc()[-500:]})
+        created = {"attempted": True, "published": None, "rejected": None,
+                   "skipped": "実行エラー(create_error参照)"}
     if created.get("published"):
         print(f"  CREATE: published {created['published']['url']}")
     elif created.get("rejected"):
@@ -394,6 +427,7 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
         print("  (dry-run: 公開・通知はスキップ)")
 
     print(f"tick {tick_id} done — {summary}")
+    LOCK.unlink(missing_ok=True)
     return 0
 
 

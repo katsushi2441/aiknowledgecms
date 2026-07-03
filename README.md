@@ -26,11 +26,11 @@ SENSE → RESEARCH → TRIAGE → ACT → CREATE → DISTRIBUTE
 | Stage | What happens | Status |
 |---|---|---|
 | SENSE | Analytics / Search Console / access logs / uptime become structured observations | ✅ Phase 1 |
-| RESEARCH | Collector adapters gather trends and sources | Phase 2 |
+| RESEARCH | Collector adapters gather trends and sources | ✅ Phase 2 |
 | TRIAGE | Observations become a prioritized issue queue | ✅ Phase 1 (rule-based) |
 | ACT | Playbook-driven fixes; site changes land as worktree PRs | Phase 3 |
-| CREATE | Content generation behind quality gates (separate verifier agent) | Phase 2 |
-| DISTRIBUTE | Publisher / announcer adapters ship the output | Phase 1: loop reports only |
+| CREATE | Content generation behind quality gates (separate verifier agent) | ✅ Phase 2 |
+| DISTRIBUTE | Publisher / announcer adapters ship the output | ✅ Phase 2 (articles + reports + AIxSNS) |
 
 ## Quick start (Phase 1)
 
@@ -98,8 +98,9 @@ The loop that runs this repository publishes its own execution reports at
 ## Roadmap
 
 - **Phase 0** — Concept & spec (done)
-- **Phase 1** — Core tick runner + SENSE / TRIAGE / REPORT ← **you are here**
-- **Phase 2** — CREATE / DISTRIBUTE adapters + quality gates
+- **Phase 1** — Core tick runner + SENSE / TRIAGE / REPORT (done, running hourly)
+- **Phase 2** — CREATE / DISTRIBUTE adapters + quality gates ← **you are here**
+  (first gated article published autonomously: [/articles/](https://aiknowledgecms.exbridge.jp/articles/))
 - **Phase 3** — ACT via worktrees + shareable growth cards / dashboards
 
 ## License

@@ -20,7 +20,7 @@ NAME = "agent_article"
 DEFAULT_OLLAMA = "http://127.0.0.1:11434"
 
 
-def _llm(gen_cfg: dict, agent_cli: str, prompt: str, timeout: int = 420,
+def _llm(gen_cfg: dict, agent_cli: str, prompt: str, timeout: int = 600,
          ollama_api: str = DEFAULT_OLLAMA) -> str:
     if gen_cfg.get("kind") == "ollama":
         req = urllib.request.Request(
@@ -29,6 +29,9 @@ def _llm(gen_cfg: dict, agent_cli: str, prompt: str, timeout: int = 420,
                 "model": gen_cfg["model"],
                 "prompt": prompt,
                 "stream": False,
+                # gemma4等の思考型モデルは隠れ推論がnum_predictを食い潰し
+                # 空応答になるため、明示的に思考を無効化する
+                "think": False,
                 "options": {"temperature": 0.7, "num_predict": 4096},
             }).encode(),
             headers={"Content-Type": "application/json"},

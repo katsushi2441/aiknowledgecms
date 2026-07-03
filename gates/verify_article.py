@@ -26,8 +26,9 @@ def rule_checks(draft: dict) -> list[str]:
     if len(body) > 6000:
         problems.append(f"本文が長すぎる: {len(body)}字")
     allowed = set(draft["sources"])
-    for url in re.findall(r"https?://[^\s)\"'<>」]+", body):
-        url = url.rstrip(".,;:")
+    # URLはASCII印字可能文字のみ(全角文字で必ず終端し、日本語の巻き込みを防ぐ)
+    for url in re.findall(r"https?://[!-~]+", body):
+        url = url.rstrip(".,;:)\"'）")
         if url not in allowed:
             problems.append(f"素材にないURLを引用: {url}")
     if "## 参考" not in body and "##参考" not in body:
@@ -35,7 +36,7 @@ def rule_checks(draft: dict) -> list[str]:
     return problems
 
 
-def verifier_agent(cfg: dict, draft: dict, sources_text: str, timeout: int = 420) -> dict:
+def verifier_agent(cfg: dict, draft: dict, sources_text: str, timeout: int = 600) -> dict:
     vcfg = cfg["create"]["verifier"]
     prompt = f"""あなたは記事の検証担当です。生成担当とは独立に、以下の記事が素材に忠実かを検査してください。
 
@@ -62,6 +63,7 @@ REASON: <100字以内の理由>
         api,
         data=json.dumps({
             "model": vcfg["model"], "prompt": prompt, "stream": False,
+            "think": False,  # 思考型モデル対策(隠れ推論で空応答になるのを防ぐ)
             "options": {"temperature": 0.1, "num_predict": 256},
         }).encode(),
         headers={"Content-Type": "application/json"},
