@@ -4,7 +4,7 @@
 site: https://aiknowledgecms.exbridge.jp
 env_file: /home/kojima/work/aixec/.env   # FTP_* / SMTP_* を読む(値はコミットしない)
 
-kpi: [pv_24h, uniq_ips_24h, pages_healthy]
+kpi: [pv_new_24h, uniq_ips_new_24h, pages_healthy]  # 新システムのみ(旧システム遺産PVは参考値)
 
 cadence:
   sense: hourly       # systemd timer が起動する(コード側は表示用)

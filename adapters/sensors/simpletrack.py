@@ -47,9 +47,25 @@ def sense(cfg: dict, conn, tick_id: int) -> dict:
     if rest > 0 and lines:
         lines = lines[1:]  # 先頭は途中で切れた行
 
+    # 新システム(フレームワークサイト)のパス。旧システムの遺産PVと分離して測る
+    new_paths = tuple(sc.get("new_system_paths",
+        ["/", "/index.html", "/aiknowledgecms.html", "/articles/", "/loop/"]))
+
+    def _is_new_system(url: str) -> bool:
+        try:
+            path = url.split("//", 1)[-1].split("/", 1)
+            path = "/" + (path[1] if len(path) > 1 else "")
+        except Exception:
+            return False
+        path = path.split("?")[0]
+        return any(path == np or (np.endswith("/") and np != "/" and path.startswith(np))
+                   for np in new_paths)
+
     cutoff = time.time() - 24 * 3600
     pv = 0
+    pv_new = 0
     ips: set = set()
+    ips_new: set = set()
     urls: dict = {}
     for line in lines:
         parts = line.split(" | ")
@@ -65,10 +81,16 @@ def sense(cfg: dict, conn, tick_id: int) -> dict:
         ips.add(parts[1])
         url = parts[2].split("?")[0]
         urls[url] = urls.get(url, 0) + 1
+        if _is_new_system(parts[2]):
+            pv_new += 1
+            ips_new.add(parts[1])
 
     top = sorted(urls.items(), key=lambda kv: -kv[1])[:10]
     state.record(conn, tick_id, NAME, "pv_24h", pv, {"log_bytes": size})
+    state.record(conn, tick_id, NAME, "pv_new_24h", pv_new)
     state.record(conn, tick_id, NAME, "uniq_ips_24h", len(ips))
+    state.record(conn, tick_id, NAME, "uniq_ips_new_24h", len(ips_new))
     state.record(conn, tick_id, NAME, "top_urls_24h", None,
                  {"top": [{"url": u, "pv": c} for u, c in top]})
-    return {"pv_24h": pv, "uniq_ips_24h": len(ips), "top": top}
+    return {"pv_24h": pv, "pv_new_24h": pv_new,
+            "uniq_ips_24h": len(ips), "uniq_ips_new_24h": len(ips_new), "top": top}

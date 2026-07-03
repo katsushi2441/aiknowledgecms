@@ -71,11 +71,11 @@ def triage(cfg: dict, conn, tick_id: int, sensed: dict) -> dict:
             else:
                 _resolve(fp_slow)
 
-    # PVトレンド (前tick比)
+    # PVトレンド (前tick比) — 旧システムの自然減に反応しないよう新システムPVで判定
     st = sensed.get("simpletrack")
     if st is not None:
-        prev = state.latest_value(conn, "pv_24h", before_tick=tick_id)
-        cur = st["pv_24h"]
+        prev = state.latest_value(conn, "pv_new_24h", before_tick=tick_id)
+        cur = st.get("pv_new_24h", 0)
         drop_pct = int(th.get("pv_drop_pct", 30))
         if prev is not None and prev >= 20 and cur < prev * (1 - drop_pct / 100):
             _open("pv_drop", "warning",
@@ -159,8 +159,8 @@ def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run, researched=Non
     lines.append("## KPI")
     st = sensed.get("simpletrack") or {}
     hh = sensed.get("http_health") or {}
-    lines.append(f"- pv_24h: **{st.get('pv_24h', 'n/a')}**")
-    lines.append(f"- uniq_ips_24h: **{st.get('uniq_ips_24h', 'n/a')}**")
+    lines.append(f"- pv_new_24h(新システム): **{st.get('pv_new_24h', 'n/a')}** / 全体 {st.get('pv_24h', 'n/a')}")
+    lines.append(f"- uniq_ips_new_24h: **{st.get('uniq_ips_new_24h', 'n/a')}** / 全体 {st.get('uniq_ips_24h', 'n/a')}")
     lines.append(f"- pages_healthy: **{hh.get('healthy', '?')}/{hh.get('total', '?')}**")
     lines.append("")
     if st.get("top"):
@@ -415,7 +415,7 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
 
     st = sensed.get("simpletrack") or {}
     hh = sensed.get("http_health") or {}
-    summary = (f"pv24h={st.get('pv_24h', '?')} healthy={hh.get('healthy', '?')}/"
+    summary = (f"pv_new={st.get('pv_new_24h', '?')}/{st.get('pv_24h', '?')} healthy={hh.get('healthy', '?')}/"
                f"{hh.get('total', '?')} open_issues={len(state.open_issues(conn))}")
     state.finish_tick(conn, tick_id, summary)
 
