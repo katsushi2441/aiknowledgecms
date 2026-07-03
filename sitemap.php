@@ -7,6 +7,9 @@ echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
    固定ページ
 ========================= */
 $static_pages = array(
+    ""                     => "1.0",   // トップ(Agent Loopフレームワーク EN)
+    "aiknowledgecms.html"  => "1.0",   // 日本語版
+    "articles/"            => "0.9",   // Loop生成メディア一覧
     "aiknowledgecms.php"   => "1.0",
     "aithinkingmedia.php"  => "0.9",
     "aitrend.php"          => "0.9",
@@ -28,6 +31,23 @@ foreach($static_pages as $file => $priority){
     echo '<loc>'.$base_url.'/'.$file.'</loc>';
     echo '<priority>'.$priority.'</priority>';
     echo '</url>';
+}
+/* =========================
+   Loop生成記事 (/articles/*.html)
+========================= */
+$article_files = glob(__DIR__."/articles/*.html");
+if ($article_files !== false) {
+    foreach ($article_files as $f) {
+        $name = basename($f);
+        if ($name === "index.html") { continue; }
+        $lastmod = date("Y-m-d", filemtime($f));
+        echo '<url>';
+        echo '<loc>'.$base_url.'/articles/'.rawurlencode($name).'</loc>';
+        echo '<lastmod>'.$lastmod.'</lastmod>';
+        echo '<changefreq>weekly</changefreq>';
+        echo '<priority>0.8</priority>';
+        echo '</url>';
+    }
 }
 /* =========================
    キーワードページ
