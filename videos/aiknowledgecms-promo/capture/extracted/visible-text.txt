@@ -1,0 +1,136 @@
+[span] AIKnowledgeCMS
+[sub] AGENT LOOP CMS
+[a] 日本語
+[a] GitHub →
+[div] Loop Engineering for Website Growth
+[h1] A CMS operated by
+[em] an agent loop
+[h1] , not by you.
+[p] An AI agent runs an endless growth loop over your knowledge site — sensing its health,
+    researching what matters, triaging issues, acting, creating and distributing content,
+    then feeding every result back into the next cycle.
+    There is no admin panel. There is a loop.
+[a] View on GitHub
+[a] See the Loop ↓
+[a] ⚙ Phase 2 — The loop now writes. Gated articles at /articles/, tick reports at /loop/ →
+[span] The Growth Loop
+[h2] One tick, six stages
+[p] Each cycle is a resumable "tick" — not a runaway
+[code] while(true)
+[p] .
+      A scheduler fires the tick; the agent walks the stages guided by playbooks; every result is measured and written back.
+[span] SENSE
+[h3] Monitor the site
+[p] Analytics, Search Console, access logs, revenue and uptime become structured observations in the loop's memory.
+[span] RESEARCH
+[h3] Collect information
+[p] Trends, sources and competitor signals are gathered by collector adapters — the raw material for decisions.
+[span] TRIAGE
+[h3] Organize the issues
+[p] Observations become a prioritized issue queue: traffic drops, indexing errors, content gaps, stale pages.
+[span] ACT
+[h3] Fix what's broken
+[p] The agent works issues via playbooks — SEO fixes and site changes land through git worktrees as pull requests.
+[span] CREATE
+[h3] Generate content
+[p] Articles, videos and share cards are generated — and must pass quality gates (a separate verifier agent) before anything ships.
+[span] DISTRIBUTE
+[h3] Publish & announce
+[p] Publisher and announcer adapters push content to the site, social feeds and video platforms.
+[div] MEASURE — results flow back into SENSE. The loop learns what grew the site, and does more of that.
+[span] Architecture
+[h2] Six components, agent-agnostic
+[p] The agent is replaceable — any agent CLI (
+[code] claude -p
+[code] codex exec
+[p] ) can execute a stage.
+      The loop is the product.
+[h3] Ticks & scheduling
+[p] cron/systemd fires resumable ticks per cadence — sense hourly, create daily, act weekly. Crash-safe: every tick starts from persisted state.
+[h3] Playbooks
+[p] Procedures are first-class files. The agent must read the playbook before executing a stage — no improvisation on production.
+[h3] Adapters
+[p] Pluggable sensors / collectors / generators / publishers / announcers. Swap Search Console for Plausible, FTP for GitHub Pages.
+[h3] Quality gates
+[p] Creator and verifier are separate agents. Content that fails factuality or SEO gates is repaired or discarded — never silently published.
+[h3] Memory
+[p] SQLite holds the issue queue, content ledger, metrics time series and a decision log you can audit.
+[h3] Worktrees
+[p] Site-modifying actions run in isolated git worktrees and land as reviewable pull requests.
+[b] loopfile.yaml
+[span] site:
+[span] aiknowledgecms.exbridge.jp
+[span] kpi:
+[span] pv_weekly
+[span] affiliate_clicks
+[span] indexed_pages
+[span] cadence:
+[span] sense:
+[span] hourly
+[span] create:
+[span] daily
+[span] act:
+[span] weekly
+[span] budgets:
+[span] articles_per_day:
+[span] llm_cost_per_tick_usd:
+[span] 2.0
+[span] gates:
+[span] factuality_check
+[span] seo_check
+[span] escalate_when:
+[span] revenue_drop_30pct
+[span] index_errors
+[span] adapters:
+[span] sensors:
+[span] gsc
+[span] simpletrack
+[span] publisher:
+[span] ftp_heteml
+[span] announcer:
+[span] aixsns
+[span] Declarative
+[h2] One Loopfile per site
+[p] The whole loop — KPIs, cadence, budgets, gates, escalation — is declared in a single file. Point the runner at a Loopfile and the site starts growing.
+[li] KPIs define what "growth" means for this site — the loop optimizes for them
+[li] Cadence controls how often each stage runs, independently
+[li] Budgets and gates are enforced by the runner, not left to the agent's judgment
+[span] Loop Engineering
+[h2] Loops amplify judgment —
+[h2] so brakes are part of the spec
+[p] An autonomous infinite loop without guardrails is a liability. These are built in, not bolted on.
+[h4] Budgets
+[p] Hard caps per tick: LLM cost, article count, API calls. The loop stops before your wallet does.
+[h4] Dry-run
+[p] Every stage can run with full reasoning and zero side effects. Audit before you trust.
+[h4] Kill switch
+[p] One flag halts the loop. State is persisted, so resuming is safe.
+[h4] Escalation
+[p] Declared conditions page a human (email / LINE). Verification stays a human responsibility.
+[span] Dogfooding
+[h2] This site is the reference deployment
+[p] aiknowledgecms.exbridge.jp itself is being rebuilt as the framework's first instance:
+      an AI-agent-economy media site grown by the loop — articles, videos, share cards and revenue,
+      all produced and measured by the loop, with every tick's report published.
+      The framework's proof is the site you are reading.
+[span] Roadmap
+[h2] Where this is going
+[h4] Concept & spec ✓
+[p] Manifesto, Loopfile specification, architecture. Public from day one.
+[h4] Core tick runner + SENSE / TRIAGE / REPORT ✓
+[p] Real sensors populate the issue queue in SQLite. Every tick publishes a
+[a] public loop report
+[p] — running hourly on this site.
+[h4] CREATE / DISTRIBUTE + quality gates
+[span] YOU ARE HERE
+[p] The loop researches sources, generates
+[a] articles
+[p] , and publishes only what passes an independent verifier gate — rejected drafts stay in the ledger with reasons.
+[h4] ACT + share features
+[p] Site-modifying playbooks via worktrees; diagnosis cards, growth cards and dashboards that users want to share.
+[a] Loop Reports
+[a] AIRadarX (legacy)
+[a] AIKnowledgeSNS
+[a] Kurage Project
+[a] X @xb_bittensor
+[div] © 2026 EXBRIDGE, Inc. All rights reserved. — This site participates in the Amazon Associates Program. Product links may contain affiliate links.

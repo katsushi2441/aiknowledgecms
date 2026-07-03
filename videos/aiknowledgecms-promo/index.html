@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AIKnowledgeCMS Promo</title>
+<style>
+  html, body { margin:0; width:100%; height:100%; background:#FFFFFF; }
+  [data-composition-id="aiknowledgecms-promo"] {
+    position: relative;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    background: #FFFFFF;
+    color: #101828;
+    font-family: Inter, ui-sans-serif, sans-serif;
+  }
+  .scene {
+    position:absolute; inset:0; width:100%; height:100%; overflow:hidden;
+    background:#FFFFFF; opacity:0; visibility:hidden;
+  }
+  #scene1 { opacity:1; visibility:visible; }
+  .scene::before {
+    content:""; position:absolute; inset:0; opacity:.72;
+    background-image: radial-gradient(circle, #D0D5DD 1.5px, rgba(255,255,255,0) 1.5px);
+    background-size: 30px 30px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 85% at 50% 38%, #000 25%, rgba(0,0,0,0) 78%);
+    mask-image: radial-gradient(ellipse 70% 85% at 50% 38%, #000 25%, rgba(0,0,0,0) 78%);
+  }
+  .glow { position:absolute; border-radius:999px; filter: blur(34px); opacity:.36; }
+  .glow.purple { background:#4F46E5; }
+  .glow.cyan { background:#0891B2; }
+  .topbar { position:absolute; left:88px; right:88px; top:44px; display:flex; align-items:center; justify-content:space-between; z-index:6; }
+  .brand { display:flex; align-items:center; gap:18px; font-weight:900; font-size:30px; letter-spacing:-.02em; }
+  .mark { width:58px; height:58px; border-radius:18px; display:flex; align-items:center; justify-content:center; background:#4F46E5; color:#FFFFFF; box-shadow:0 20px 42px rgba(79,70,229,.28); font-size:31px; }
+  .meta { font-family:ui-monospace, monospace; color:#4F46E5; letter-spacing:.16em; text-transform:uppercase; font-size:20px; font-weight:700; }
+  .hero-title { position:absolute; left:110px; top:190px; width:860px; z-index:4; }
+  .kicker { display:inline-flex; align-items:center; gap:14px; border:2px solid #D0D5DD; border-radius:999px; padding:14px 24px; color:#4F46E5; font-size:20px; font-weight:900; letter-spacing:.14em; text-transform:uppercase; background:#FFFFFF; }
+  .dot { width:11px; height:11px; border-radius:999px; background:#4F46E5; }
+  h1 { margin:34px 0 0; font-size:92px; line-height:1.02; letter-spacing:-.06em; font-weight:900; }
+  .grad { background: linear-gradient(92deg,#4F46E5 10%,#0891B2 90%); color:rgba(0,0,0,0); -webkit-background-clip:text; background-clip:text; }
+  .sub { margin-top:30px; color:#475467; font-size:34px; line-height:1.35; max-width:780px; }
+  .screen-card { position:absolute; right:92px; top:154px; width:760px; height:570px; border:3px solid #E9EDF3; border-radius:34px; background:#FFFFFF; overflow:hidden; box-shadow:0 34px 90px rgba(16,24,40,.16); z-index:3; }
+  .screen-card img { width:100%; height:100%; object-fit:cover; object-position:top center; }
+  .badge { position:absolute; right:720px; top:112px; width:248px; height:64px; border-radius:18px; box-shadow:0 18px 50px rgba(16,24,40,.14); border:2px solid #E9EDF3; z-index:5; background:#FFFFFF; display:flex; align-items:center; gap:12px; padding:0 16px; box-sizing:border-box; }
+  .badge .orb { width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,#FBBF24,#F87171,#4F46E5); }
+  .badge .bt { font-size:12px; color:#98A2B3; font-weight:800; text-transform:uppercase; line-height:1; }
+  .badge .bn { font-size:17px; color:#101828; font-weight:900; line-height:1.1; }
+  .loop-svg { position:absolute; right:310px; top:232px; width:620px; height:360px; z-index:2; opacity:.95; }
+  .pill-row { position:absolute; left:110px; bottom:115px; display:flex; gap:18px; z-index:5; }
+  .mini-pill { font-family:ui-monospace, monospace; font-size:19px; font-weight:800; padding:16px 22px; border:2px solid #E9EDF3; border-radius:18px; background:#FFFFFF; box-shadow:0 12px 34px rgba(16,24,40,.07); color:#101828; }
+  .scene2-title { position:absolute; left:110px; top:142px; z-index:4; width:660px; }
+  .scene2-title h2, .scene3-title h2, .scene4-title h2 { font-size:76px; line-height:1.04; letter-spacing:-.055em; margin:18px 0 0; font-weight:900; }
+  .scene2-title p, .scene3-title p, .scene4-title p { color:#475467; font-size:30px; line-height:1.42; margin:24px 0 0; }
+  .browser-frame { position:absolute; right:90px; top:116px; width:860px; height:610px; background:#FFFFFF; border:3px solid #E9EDF3; border-radius:34px; overflow:hidden; box-shadow:0 34px 90px rgba(16,24,40,.14); z-index:2; }
+  .browser-dots { height:54px; background:#F7F9FC; border-bottom:2px solid #E9EDF3; display:flex; align-items:center; gap:10px; padding:0 22px; }
+  .browser-dots span { width:14px; height:14px; border-radius:50%; display:block; }
+  .shot { width:100%; height:calc(100% - 54px); object-fit:cover; object-position:top center; }
+  .orbit { position:absolute; left:130px; bottom:80px; width:670px; height:385px; z-index:5; }
+  .stage-pill { position:absolute; display:flex; align-items:center; justify-content:center; width:196px; height:72px; border-radius:22px; background:#FFFFFF; border:3px solid #E9EDF3; box-shadow:0 18px 42px rgba(16,24,40,.1); font-family:ui-monospace, monospace; font-weight:900; color:#4F46E5; font-size:22px; letter-spacing:.08em; }
+  .stage-pill.sense { left:10px; top:30px; } .stage-pill.research { left:235px; top:0; } .stage-pill.triage { right:10px; top:65px; }
+  .stage-pill.act { right:38px; bottom:30px; } .stage-pill.create { left:245px; bottom:0; } .stage-pill.distribute { left:0; bottom:72px; }
+  .tick-core { position:absolute; left:250px; top:128px; width:170px; height:170px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#4F46E5,#0891B2); color:#FFFFFF; font-size:42px; font-weight:900; box-shadow:0 24px 70px rgba(79,70,229,.34); }
+  .scene3-title { position:absolute; left:110px; top:120px; width:620px; z-index:5; }
+  .code-card { position:absolute; left:108px; bottom:92px; width:745px; height:390px; background:#0F172A; border-radius:30px; overflow:hidden; box-shadow:0 35px 95px rgba(15,23,42,.28); z-index:3; }
+  .code-bar { height:58px; background:#1E293B; display:flex; align-items:center; gap:12px; padding:0 22px; color:#98A2B3; font-family:ui-monospace, monospace; font-size:20px; }
+  .code-dot { width:15px; height:15px; border-radius:50%; } .r{background:#F87171}.y{background:#FBBF24}.g{background:#34D399}
+  pre { margin:0; padding:28px 34px; color:#D0D5DD; font-size:26px; line-height:1.52; font-family:ui-monospace, monospace; }
+  .code-k { color:#7DD3FC; } .code-v { color:#86EFAC; }
+  .cap-grid { position:absolute; right:105px; top:146px; width:820px; display:grid; grid-template-columns:1fr 1fr; gap:24px; z-index:5; }
+  .cap-card { min-height:170px; background:#FFFFFF; border:3px solid #E9EDF3; border-radius:28px; padding:30px 32px; box-shadow:0 18px 50px rgba(16,24,40,.08); }
+  .cap-card b { display:block; font-size:36px; letter-spacing:-.04em; margin-bottom:10px; }
+  .cap-card span { color:#475467; font-size:25px; line-height:1.32; }
+  .ledger { position:absolute; right:105px; bottom:95px; width:820px; height:88px; border-radius:22px; background:#F7F9FC; border:3px solid #E9EDF3; display:flex; align-items:center; gap:18px; padding:0 26px; z-index:6; }
+  .ledger span { flex:1; height:18px; border-radius:999px; background:#D0D5DD; overflow:hidden; }
+  .ledger span i { display:block; height:100%; width:70%; background:linear-gradient(90deg,#4F46E5,#0891B2); border-radius:999px; }
+  .proof-wall { position:absolute; left:110px; top:156px; right:110px; bottom:150px; z-index:4; display:grid; grid-template-columns:1.05fr .95fr; gap:34px; }
+  .proof-big { position:relative; border:3px solid #E9EDF3; border-radius:34px; overflow:hidden; background:#FFFFFF; box-shadow:0 34px 90px rgba(16,24,40,.13); }
+  .proof-big img { width:100%; height:100%; object-fit:cover; object-position:top center; }
+  .proof-side { display:flex; flex-direction:column; gap:26px; }
+  .proof-card { flex:1; border:3px solid #E9EDF3; border-radius:30px; background:#FFFFFF; box-shadow:0 18px 50px rgba(16,24,40,.08); padding:34px; position:relative; overflow:hidden; }
+  .proof-card b { display:block; font-size:40px; letter-spacing:-.045em; margin-bottom:14px; }
+  .proof-card p { margin:0; color:#475467; font-size:27px; line-height:1.38; }
+  .stamp { position:absolute; right:24px; top:24px; color:#059669; background:#E8F7F1; border:2px solid rgba(5,150,105,.22); border-radius:999px; padding:10px 16px; font-family:ui-monospace, monospace; font-size:18px; font-weight:900; }
+  .final-cta { position:absolute; left:0; right:0; bottom:44px; display:flex; align-items:center; justify-content:center; gap:24px; z-index:8; }
+  .url { font-size:34px; color:#101828; font-weight:900; letter-spacing:-.02em; background:#FFFFFF; border:3px solid #E9EDF3; border-radius:22px; padding:18px 26px; box-shadow:0 18px 42px rgba(16,24,40,.08); }
+  .cta { background:#101828; color:#FFFFFF; border-radius:22px; padding:20px 30px; font-size:26px; font-weight:900; }
+  .fade-cover { position:absolute; inset:0; background:#FFFFFF; z-index:20; pointer-events:none; opacity:0; }
+</style>
+</head>
+<body>
+<div data-composition-id="aiknowledgecms-promo" data-width="1920" data-height="1080" data-start="0" data-duration="33">
+  <audio id="narration" src="narration.wav" data-start="0" data-duration="32.94" data-track-index="0" data-volume="1"></audio>
+
+  <section class="scene" id="scene1">
+    <div class="glow purple" style="width:560px;height:260px;right:150px;top:170px"></div>
+    <div class="glow cyan" style="width:360px;height:220px;right:500px;top:390px"></div>
+    <div class="topbar"><div class="brand"><div class="mark">∞</div><div>AIKnowledgeCMS<br><span class="meta">Agent Loop CMS</span></div></div><div class="meta">Orynth launch asset</div></div>
+    <div class="badge"><span class="orb"></span><span><span class="bt">Featured on</span><br><span class="bn">Orynth</span></span></div>
+    <svg class="loop-svg" viewBox="0 0 620 360" data-layout-ignore>
+      <path id="loopPath" d="M80,180 C150,50 255,50 310,180 C365,310 470,310 540,180 C470,50 365,50 310,180 C255,310 150,310 80,180" fill="none" stroke="#4F46E5" stroke-width="10" stroke-linecap="round" opacity=".22"/>
+      <path id="loopPath2" d="M80,180 C150,50 255,50 310,180 C365,310 470,310 540,180 C470,50 365,50 310,180 C255,310 150,310 80,180" fill="none" stroke="#0891B2" stroke-width="4" stroke-linecap="round" opacity=".85"/>
+    </svg>
+    <div class="hero-title">
+      <div class="kicker"><span class="dot"></span>Loop engineering for website growth</div>
+      <h1>Not an admin panel.<br><span class="grad">An agent loop.</span></h1>
+      <p class="sub">A CMS that senses, researches, creates, verifies and distributes as a measurable cycle.</p>
+    </div>
+    <div class="screen-card"><img src="capture/screenshots/scroll-000.png" alt="AIKnowledgeCMS hero screenshot"></div>
+    <div class="pill-row"><span class="mini-pill">SENSE</span><span class="mini-pill">CREATE</span><span class="mini-pill">DISTRIBUTE</span></div>
+  </section>
+
+  <section class="scene" id="scene2">
+    <div class="glow purple" style="width:480px;height:260px;left:170px;bottom:120px"></div>
+    <div class="scene2-title"><div class="meta">The Growth Loop</div><h2>One tick,<br><span class="grad">six stages.</span></h2><p>Every result flows back into the next cycle, so the site keeps learning what works.</p></div>
+    <div class="browser-frame"><div class="browser-dots"><span class="r"></span><span class="y"></span><span class="g"></span><b class="meta" style="font-size:17px">/loop</b></div><img class="shot" id="loopShot" src="capture/screenshots/scroll-021.png" alt="growth loop screenshot"></div>
+    <div class="orbit">
+      <svg width="670" height="385" viewBox="0 0 670 385" data-layout-ignore><path id="cycleLine" d="M108,66 C260,-30 540,28 585,170 C628,308 420,406 206,340 C22,284 -35,146 108,66" fill="none" stroke="#D0D5DD" stroke-width="5" stroke-linecap="round"/><path id="cycleLineHot" d="M108,66 C260,-30 540,28 585,170 C628,308 420,406 206,340 C22,284 -35,146 108,66" fill="none" stroke="#059669" stroke-width="7" stroke-linecap="round"/></svg>
+      <div class="tick-core">tick</div><div class="stage-pill sense">SENSE</div><div class="stage-pill research">RESEARCH</div><div class="stage-pill triage">TRIAGE</div><div class="stage-pill act">ACT</div><div class="stage-pill create">CREATE</div><div class="stage-pill distribute">DISTRIBUTE</div>
+    </div>
+  </section>
+
+  <section class="scene" id="scene3">
+    <div class="glow cyan" style="width:520px;height:270px;right:160px;top:90px"></div>
+    <div class="scene3-title"><div class="meta">Declarative automation</div><h2>One <span class="grad">Loopfile</span><br>per site.</h2><p>KPIs, cadence, budgets, gates, escalation and adapters become auditable system behavior.</p></div>
+    <div class="code-card"><div class="code-bar"><span class="code-dot r"></span><span class="code-dot y"></span><span class="code-dot g"></span><b>loopfile.yaml</b></div><pre><span class="code-k">site:</span> <span class="code-v">aiknowledgecms.exbridge.jp</span>
+<span class="code-k">kpi:</span> [pv_weekly, indexed_pages]
+<span class="code-k">cadence:</span> sense: hourly / create: daily
+<span class="code-k">budgets:</span> articles_per_day: 3
+<span class="code-k">gates:</span> factuality_check, seo_check
+<span class="code-k">adapters:</span> gsc, simpletrack, aixsns</pre></div>
+    <div class="cap-grid"><div class="cap-card"><b>KPIs</b><span>Define what growth means.</span></div><div class="cap-card"><b>Budgets</b><span>Hard caps before agents act.</span></div><div class="cap-card"><b>Gates</b><span>Verifier before publishing.</span></div><div class="cap-card"><b>Adapters</b><span>Swap sources and publishers.</span></div></div>
+    <div class="ledger"><span><i></i></span><span><i style="width:48%"></i></span><span><i style="width:82%"></i></span><span><i style="width:58%"></i></span></div>
+  </section>
+
+  <section class="scene" id="scene4">
+    <div class="glow purple" style="width:520px;height:280px;left:90px;top:120px"></div>
+    <div class="scene4-title" style="position:absolute;left:110px;top:74px;z-index:7;width:1180px"><div class="meta">Proof, not promise</div><h2 style="font-size:64px;line-height:1.02;margin-top:12px">Already dogfooding itself.</h2></div>
+    <div class="proof-wall" style="top:215px;bottom:142px"><div class="proof-big"><img src="capture/screenshots/scroll-082.png" alt="guardrails screenshot"></div><div class="proof-side"><div class="proof-card"><span class="stamp">RUNNING</span><b>Live loop reports</b><p>Every tick leaves an auditable report at the reference site.</p></div><div class="proof-card"><span class="stamp">GATED</span><b>Generated articles</b><p>Content ships only after a separate verifier passes it.</p></div></div></div>
+    <div class="final-cta"><div class="url">aiknowledgecms.exbridge.jp</div><div class="cta">View on GitHub →</div></div>
+  </section>
+  <div class="fade-cover"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<script>
+  window.__timelines = window.__timelines || {};
+  const tl = gsap.timeline({ paused: true });
+  const scenes = ['#scene1','#scene2','#scene3','#scene4'];
+  tl.set(['#scene2','#scene3','#scene4'], { opacity: 0, visibility: 'hidden' });
+  tl.set('#scene1', { opacity: 1, visibility: 'visible', filter:'blur(0px)' }, 0);
+  
+
+  tl.fromTo('#scene1 .topbar', { y:-26, opacity:0 }, { y:0, opacity:1, duration:.65, ease:'power3.out' }, .2);
+  tl.fromTo('#scene1 .kicker', { x:-58, opacity:0 }, { x:0, opacity:1, duration:.72, ease:'expo.out' }, .48);
+  tl.fromTo('#scene1 h1', { y:70, opacity:0, scale:.96 }, { y:0, opacity:1, scale:1, duration:.86, ease:'power4.out' }, .82);
+  tl.fromTo('#scene1 .sub', { x:-44, opacity:0 }, { x:0, opacity:1, duration:.62, ease:'power2.out' }, 1.3);
+  tl.fromTo('#scene1 .screen-card', { x:120, y:30, opacity:0, scale:.92, rotation:2 }, { x:0, y:0, opacity:1, scale:1, rotation:0, duration:.96, ease:'expo.out' }, .62);
+  tl.fromTo('#scene1 .screen-card img', { scale:1 }, { scale:1.035, duration:6.2, ease:'none' }, .85);
+  tl.fromTo('#scene1 .badge', { y:-34, opacity:0, scale:.85 }, { y:0, opacity:1, scale:1, duration:.56, ease:'back.out(1.6)' }, 1.18);
+  tl.fromTo('#loopPath2', { strokeDasharray: 1600, strokeDashoffset: 1600 }, { strokeDashoffset:0, duration:3.2, ease:'power2.out' }, 1.15);
+  tl.fromTo('#scene1 .mini-pill', { y:34, opacity:0 }, { y:0, opacity:1, stagger:.12, duration:.48, ease:'power3.out' }, 2.1);
+
+  tl.set('#scene2', { opacity: 1, visibility:'visible', filter:'blur(0px)' }, 7.1);
+  tl.fromTo('#scene2 .scene2-title', { x:-80, opacity:0 }, { x:0, opacity:1, duration:.72, ease:'power3.out' }, 7.25);
+  tl.fromTo('#scene2 .browser-frame', { x:120, opacity:0, scale:.94 }, { x:0, opacity:1, scale:1, duration:.82, ease:'expo.out' }, 7.45);
+  tl.fromTo('#loopShot', { y:0, scale:1.02 }, { y:-185, scale:1.02, duration:7.0, ease:'sine.inOut' }, 7.9);
+  tl.fromTo('#cycleLineHot', { strokeDasharray: 1700, strokeDashoffset: 1700 }, { strokeDashoffset:0, duration:3.4, ease:'power2.out' }, 8.0);
+  tl.fromTo('#scene2 .tick-core', { scale:.65, opacity:0 }, { scale:1, opacity:1, duration:.48, ease:'back.out(1.8)' }, 8.15);
+  tl.fromTo('#scene2 .stage-pill', { y:35, opacity:0, scale:.88 }, { y:0, opacity:1, scale:1, stagger:.14, duration:.48, ease:'power3.out' }, 8.5);
+  tl.to('#scene2 .tick-core', { scale:1.07, yoyo:true, repeat:5, duration:.55, ease:'sine.inOut' }, 9.1);
+
+  tl.to('#scene2', { opacity:0, filter:'blur(12px)', duration:.55, ease:'sine.inOut' }, 15.0);
+  tl.set('#scene2', { visibility:'hidden', immediateRender:false }, 15.55);
+  tl.set('#scene3', { opacity:1, visibility:'visible', filter:'blur(0px)' }, 15.25);
+  tl.fromTo('#scene3 .scene3-title', { y:-40, opacity:0 }, { y:0, opacity:1, duration:.68, ease:'power3.out' }, 15.35);
+  tl.fromTo('#scene3 .code-card', { x:-90, opacity:0, scale:.94 }, { x:0, opacity:1, scale:1, duration:.78, ease:'expo.out' }, 15.75);
+  tl.fromTo('#scene3 .cap-card', { x:70, opacity:0, scale:.95 }, { x:0, opacity:1, scale:1, stagger:.14, duration:.52, ease:'power3.out' }, 16.4);
+  tl.fromTo('#scene3 pre', { y:26, opacity:.4 }, { y:0, opacity:1, duration:.85, ease:'power2.out' }, 16.2);
+  tl.fromTo('#scene3 .ledger', { y:44, opacity:0 }, { y:0, opacity:1, duration:.56, ease:'back.out(1.4)' }, 18.4);
+  tl.fromTo('#scene3 .ledger i', { width:'8%' }, { width:'85%', stagger:.12, duration:1.2, ease:'power2.inOut' }, 18.75);
+  tl.to('#scene3 .code-card', { y:-8, yoyo:true, repeat:3, duration:1.0, ease:'sine.inOut' }, 19.2);
+
+  tl.to('#scene3', { opacity:0, filter:'blur(12px)', duration:.55, ease:'sine.inOut' }, 24.0);
+  tl.set('#scene3', { visibility:'hidden', immediateRender:false }, 24.55);
+  tl.set('#scene4', { opacity:1, visibility:'visible', filter:'blur(0px)' }, 24.25);
+  tl.fromTo('#scene4 .scene4-title', { y:-35, opacity:0 }, { y:0, opacity:1, duration:.62, ease:'power3.out' }, 24.35);
+  tl.fromTo('#scene4 .proof-big', { x:-85, opacity:0, scale:.94 }, { x:0, opacity:1, scale:1, duration:.82, ease:'expo.out' }, 24.65);
+  tl.fromTo('#scene4 .proof-side .proof-card', { x:80, opacity:0, scale:.94 }, { x:0, opacity:1, scale:1, stagger:.18, duration:.62, ease:'power3.out' }, 25.0);
+  tl.fromTo('#scene4 .proof-big img', { scale:1 }, { scale:1.04, duration:7.5, ease:'none' }, 25.0);
+  tl.fromTo('#scene4 .stamp', { scale:1.45, opacity:0, rotation:-4 }, { scale:1, opacity:1, rotation:0, stagger:.18, duration:.42, ease:'back.out(2)' }, 26.15);
+  tl.fromTo('#scene4 .final-cta', { y:60, opacity:0 }, { y:0, opacity:1, duration:.72, ease:'power4.out' }, 29.55);
+  tl.to('#scene4 .cta', { boxShadow:'0 0 0 10px rgba(79,70,229,.14)', yoyo:true, repeat:2, duration:.45, ease:'sine.inOut' }, 30.4);
+  tl.fromTo('.fade-cover', { opacity:0 }, { opacity:1, duration:.55, ease:'sine.inOut' }, 32.45);
+  tl.set('#scene4', { visibility:'hidden', immediateRender:false }, 33.00);
+  window.__timelines['aiknowledgecms-promo'] = tl;
+</script>
+</body>
+</html>

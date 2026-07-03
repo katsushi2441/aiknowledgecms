@@ -1,0 +1,201 @@
+{
+  "typography": [
+    {
+      "role": "display",
+      "fontFamily": "Inter",
+      "fontSize": "66px",
+      "fontWeight": "800",
+      "lineHeight": "72.6px",
+      "letterSpacing": "-2.31px",
+      "color": "#101828",
+      "sampleText": "A CMS operated byan agent loop, not by you."
+    },
+    {
+      "role": "heading",
+      "fontFamily": "Inter",
+      "fontSize": "38px",
+      "fontWeight": "800",
+      "lineHeight": "47.5px",
+      "letterSpacing": "-1.14px",
+      "color": "#101828",
+      "sampleText": "One tick, six stages"
+    },
+    {
+      "role": "body",
+      "fontFamily": "Inter",
+      "fontSize": "17.5px",
+      "fontWeight": "400",
+      "lineHeight": "29.75px",
+      "letterSpacing": "normal",
+      "color": "#475467",
+      "sampleText": "An AI agent runs an endless growth loop over your knowledge "
+    },
+    {
+      "role": "heading-3",
+      "fontFamily": "Inter",
+      "fontSize": "16.5px",
+      "fontWeight": "800",
+      "lineHeight": "28.05px",
+      "letterSpacing": "-0.165px",
+      "color": "#101828",
+      "sampleText": "Monitor the site"
+    },
+    {
+      "role": "label",
+      "fontFamily": "Inter",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "lineHeight": "27.2px",
+      "letterSpacing": "normal",
+      "color": "#101828",
+      "sampleText": "1SENSEMonitor the siteAnalytics, Search Console, access logs"
+    },
+    {
+      "role": "link",
+      "fontFamily": "Inter",
+      "fontSize": "15.5px",
+      "fontWeight": "800",
+      "lineHeight": "26.35px",
+      "letterSpacing": "-0.155px",
+      "color": "#101828",
+      "sampleText": "∞ AIKnowledgeCMSAGENT LOOP CMS"
+    },
+    {
+      "role": "heading-4",
+      "fontFamily": "Inter",
+      "fontSize": "14.5px",
+      "fontWeight": "800",
+      "lineHeight": "24.65px",
+      "letterSpacing": "normal",
+      "color": "#101828",
+      "sampleText": "Budgets"
+    },
+    {
+      "role": "code",
+      "fontFamily": "SFMono-Regular",
+      "fontSize": "14.26px",
+      "fontWeight": "400",
+      "lineHeight": "24.242px",
+      "letterSpacing": "normal",
+      "color": "#4F46E5",
+      "sampleText": "while(true)"
+    }
+  ],
+  "spacing": {
+    "observed": [
+      4,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      14,
+      16,
+      18,
+      20,
+      22,
+      24,
+      26
+    ],
+    "baseUnit": 4
+  },
+  "radius": [
+    "10px",
+    "12px",
+    "16px"
+  ],
+  "shadows": [],
+  "buttons": [
+    {
+      "label": "日本語",
+      "background": "#FFFFFF",
+      "color": "#475467",
+      "padding": "9px 18px",
+      "borderRadius": "10px",
+      "border": "1px solid rgb(208, 213, 221)",
+      "boxShadow": "none",
+      "fontSize": "13.5px",
+      "fontWeight": "700",
+      "height": "42.9375px"
+    },
+    {
+      "label": "GitHub →",
+      "background": "#101828",
+      "color": "#FFFFFF",
+      "padding": "9px 18px",
+      "borderRadius": "10px",
+      "border": "0px none rgb(255, 255, 255)",
+      "boxShadow": "none",
+      "fontSize": "13.5px",
+      "fontWeight": "700",
+      "height": "40.9375px"
+    },
+    {
+      "label": "View on GitHub\n    See the Loop ↓",
+      "background": "transparent",
+      "color": "#101828",
+      "padding": "0px",
+      "borderRadius": "0px",
+      "border": "0px none rgb(16, 24, 40)",
+      "boxShadow": "none",
+      "fontSize": "16px",
+      "fontWeight": "400",
+      "height": "55.5px"
+    },
+    {
+      "label": "View on GitHub",
+      "background": "#101828",
+      "color": "#FFFFFF",
+      "padding": "14px 28px",
+      "borderRadius": "12px",
+      "border": "0px none rgb(255, 255, 255)",
+      "boxShadow": "none",
+      "fontSize": "15px",
+      "fontWeight": "700",
+      "height": "55.5px"
+    }
+  ],
+  "cards": [],
+  "nav": {
+    "label": "navigation",
+    "background": "#FFFFFF",
+    "color": "#101828",
+    "padding": "0px",
+    "borderRadius": "0px",
+    "border": "",
+    "boxShadow": "none",
+    "fontSize": "16px",
+    "fontWeight": "400",
+    "height": "63.9375px"
+  },
+  "chips": [
+    {
+      "label": "SENSE",
+      "background": "transparent",
+      "color": "#4F46E5",
+      "padding": "0px",
+      "borderRadius": "0px",
+      "border": "0px none rgb(79, 70, 229)",
+      "boxShadow": "none",
+      "fontSize": "11px",
+      "fontWeight": "700",
+      "height": "18.6875px"
+    },
+    {
+      "label": "YOU ARE HERE",
+      "background": "#EEF0FE",
+      "color": "#4F46E5",
+      "padding": "2px 9px",
+      "borderRadius": "999px",
+      "border": "0px none rgb(79, 70, 229)",
+      "boxShadow": "none",
+      "fontSize": "10.5px",
+      "fontWeight": "800",
+      "height": "21.8438px"
+    }
+  ],
+  "statCells": [],
+  "tabs": []
+}
