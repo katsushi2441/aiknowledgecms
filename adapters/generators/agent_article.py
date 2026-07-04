@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import urllib.parse
 import urllib.request
 
 from core import state
@@ -48,6 +49,46 @@ def _llm(gen_cfg: dict, agent_cli: str, prompt: str, timeout: int = 600,
     return proc.stdout
 
 
+def _enrich_query(conn, tick_id: int, query: str) -> list:
+    """GSCクエリをGitHub検索で実在の根拠に接地させ、researchに登録して返す。
+
+    接地できないクエリの記事は創作になるため書かない(呼び出し側でフォールバック)。
+    """
+    url = ("https://api.github.com/search/repositories?q="
+           + urllib.parse.quote(query) + "&per_page=3")
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "AIKnowledgeCMS-Loop", "Accept": "application/vnd.github+json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            items = json.loads(r.read()).get("items", [])
+    except Exception:
+        return []
+    urls = []
+    for it in items:
+        desc = (it.get("description") or "").strip()
+        if not desc:
+            continue
+        summary = (f"{desc} / ⭐{it.get('stargazers_count', 0)}"
+                   + (f" / 言語: {it['language']}" if it.get("language") else ""))
+        try:
+            conn.execute(
+                "INSERT INTO research (tick_id, source, title, url, summary, score, created_at)"
+                " VALUES (?, 'github_enrich', ?, ?, ?, 5, ?)",
+                (tick_id, f"GitHub: {it['full_name']}", it["html_url"],
+                 summary[:400], state.now()))
+        except Exception:
+            pass  # 既出URL
+        urls.append(it["html_url"])
+        if len(urls) >= 2:
+            break
+    conn.commit()
+    if not urls:
+        return []
+    return conn.execute(
+        "SELECT * FROM research WHERE url IN ({})".format(",".join("?" * len(urls))),
+        urls).fetchall()
+
+
 def pick_sources(conn, n: int = 3):
     """未使用のresearchからスコア・新しさ順に題材を選ぶ。"""
     return conn.execute(
@@ -69,14 +110,13 @@ def build_prompt(cfg: dict, sources) -> str:
         return f"""あなたは技術メディア「AIKnowledgeCMS」の記事ライターです。
 Google検索クエリ「{q}」で検索する読者の疑問に答える、日本語の解説記事を書いてください。
 
-テーマ: {theme}
-
-# 補助素材(あれば根拠として使ってよい。この素材とあなたの一般的な技術知識の範囲で書く)
+# 素材(実在の情報。記事の主題はこの素材が指すツール/リポジトリの解説)
 {news_lines}
 
 # 執筆ルール
-- 900〜1500字。です・ます調。検索意図に最初の段落で直接答える。
-- 一般的な技術概念の説明はよいが、具体的な統計・日付・企業の動向・製品発表は素材にない限り書かない。
+- 900〜1500字。です・ます調。「{q}とは何か」に最初の段落で直接答える。
+- 素材のdescription・スター数・言語は事実として使ってよい。それ以外の具体的な機能・数字・日付を創作しない。機能の詳細が素材にない場合は「詳細は公式リポジトリを参照」と書く。
+- テーマ性の付け足し(AIエージェント経済等)は素材と自然に関係する場合のみ1〜2文まで。
 - 記事内で参照するURLは補助素材のURLのみ使用可(無ければURLを書かない)。
 - 最後に「## 参考」を置き、使った補助素材URLを列挙(無ければ「- 一般的な技術解説です」と1行)。
 
@@ -134,6 +174,25 @@ def generate(cfg: dict, conn, tick_id: int) -> dict | None:
         state.record(conn, tick_id, NAME, "create_skipped", 1, {"reason": "no_research"})
         return None
 
+    # クエリ起点のときは「1クエリ + GitHub実データ接地」に絞る。
+    # 接地できないクエリは創作記事になるため書かず、使用済みにしてRSS素材へフォールバック。
+    if sources and sources[0]["url"].startswith("gsc://"):
+        top = sources[0]
+        query = top["title"].replace("検索クエリ「", "").split("」")[0]
+        enrich = _enrich_query(conn, tick_id, query)
+        if enrich:
+            sources = [top] + list(enrich)
+        else:
+            conn.execute("UPDATE research SET used=1 WHERE id=?", (top["id"],))
+            conn.commit()
+            state.record(conn, tick_id, NAME, "query_skipped_no_grounding", 1,
+                         {"query": query})
+            sources = [s for s in pick_sources(conn) if not s["url"].startswith("gsc://")]
+            if not sources:
+                state.record(conn, tick_id, NAME, "create_skipped", 1,
+                             {"reason": "no_groundable_sources"})
+                return None
+
     prompt = build_prompt(cfg, sources)
     raw = _llm(cfg["create"]["generator"], cfg.get("agent_cli", ""), prompt,
                ollama_api=cfg["create"].get("ollama_api", DEFAULT_OLLAMA))
@@ -143,7 +202,7 @@ def generate(cfg: dict, conn, tick_id: int) -> dict | None:
         return None
 
     # slug衝突は連番で回避
-    slug = parsed["slug"][:50]
+    slug = parsed["slug"][:50].rstrip("-")
     base = slug
     i = 2
     while conn.execute("SELECT 1 FROM content WHERE slug=?", (slug,)).fetchone():

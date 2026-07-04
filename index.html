@@ -221,6 +221,7 @@ footer{border-top:1px solid var(--line);background:var(--soft)}
     <span>AIKnowledgeCMS<sub>AGENT LOOP CMS</sub></span>
   </a>
   <div class="hactions">
+    <a class="btn btn-ghost" href="dashboard.html">📊 Dashboard</a>
     <a class="btn btn-ghost" href="aiknowledgecms.html">日本語</a>
     <a class="btn btn-primary" href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">GitHub →</a>
   </div>
@@ -240,7 +241,7 @@ footer{border-top:1px solid var(--line);background:var(--soft)}
     <a class="btn btn-primary btn-hero" href="https://github.com/katsushi2441/aiknowledgecms" target="_blank" rel="noopener">View on GitHub</a>
     <a class="btn btn-ghost btn-hero" href="#loop">See the Loop ↓</a>
   </div>
-  <a class="phase-pill" href="articles/">⚙ Phase 2 — The loop now writes. Gated articles at /articles/, tick reports at /loop/ →</a>
+  <a class="phase-pill" href="dashboard.html">⚙ Phase 3 — The loop reports its own numbers: live dashboard at /dashboard →</a>
 </div>
 
 <!-- ===== THE LOOP ===== -->
@@ -356,8 +357,8 @@ footer{border-top:1px solid var(--line);background:var(--soft)}
   <div class="roadmap">
     <div class="phase"><span class="pnum">P0</span><div class="pbody"><h4>Concept &amp; spec ✓</h4><p>Manifesto, Loopfile specification, architecture. Public from day one.</p></div></div>
     <div class="phase"><span class="pnum">P1</span><div class="pbody"><h4>Core tick runner + SENSE / TRIAGE / REPORT ✓</h4><p>Real sensors populate the issue queue in SQLite. Every tick publishes a <a href="loop/" style="color:var(--accent)">public loop report</a> — running hourly on this site.</p></div></div>
-    <div class="phase current"><span class="pnum">P2</span><div class="pbody"><h4>CREATE / DISTRIBUTE + quality gates<span class="now">YOU ARE HERE</span></h4><p>The loop researches sources, generates <a href="articles/" style="color:var(--accent)">articles</a>, and publishes only what passes an independent verifier gate — rejected drafts stay in the ledger with reasons.</p></div></div>
-    <div class="phase"><span class="pnum">P3</span><div class="pbody"><h4>ACT + share features</h4><p>Site-modifying playbooks via worktrees; diagnosis cards, growth cards and dashboards that users want to share.</p></div></div>
+    <div class="phase"><span class="pnum">P2</span><div class="pbody"><h4>CREATE / DISTRIBUTE + quality gates ✓</h4><p>The loop researches sources, generates <a href="articles/" style="color:var(--accent)">articles</a>, and publishes only what passes an independent verifier gate — rejected drafts stay in the ledger with reasons.</p></div></div>
+    <div class="phase current"><span class="pnum">P3</span><div class="pbody"><h4>ACT + share features<span class="now">IN PROGRESS</span></h4><p><a href="dashboard.html" style="color:var(--accent)">Live dashboard</a> shipped — the loop publishes its own scoreboard hourly. Next: growth cards, a diagnosis experience, and site-modifying playbooks via worktrees.</p></div></div>
   </div>
 </section>
 

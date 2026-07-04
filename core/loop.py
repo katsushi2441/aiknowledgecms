@@ -474,6 +474,13 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
     if not dry_run:
         uploaded = publish_reports(cfg, conn, tick_id, report_md)
         print(f"  REPORT published: {len(uploaded)} files")
+        try:
+            from core import dashboard
+            dash_url = dashboard.publish(cfg, conn, tick_id)
+            print(f"  DASHBOARD updated: {dash_url}")
+        except Exception:
+            print("  DASHBOARD: FAILED")
+            traceback.print_exc()
         if escalate(cfg, triaged["opened"]):
             print("  ESCALATE: email sent")
     else:
