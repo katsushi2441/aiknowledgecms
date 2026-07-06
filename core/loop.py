@@ -401,13 +401,32 @@ def md_to_simple_html(md: str) -> str:
     out = []
     in_list = False
     import re as _re
-    for line in md.splitlines():
-        esc = html.escape(line)
-        # 最小限の整形(見出し・リスト・太字・リンク)のみ
+
+    def _inline(esc: str) -> str:
+        """太字・markdownリンク・裸URLの自動リンク化。"""
         while "**" in esc:
             esc = esc.replace("**", "<strong>", 1).replace("**", "</strong>", 1)
-        esc = _re.sub(r"\[([^\]]+)\]\((https?://[^\s)]+)\)",
-                      r'<a href="\2">\1</a>', esc)
+        # markdownリンクを一旦プレースホルダに退避(裸URL処理と衝突させない)
+        anchors: list[str] = []
+
+        def _mk(m):
+            anchors.append(f'<a href="{m.group(2)}">{m.group(1)}</a>')
+            return f"\x00{len(anchors) - 1}\x00"
+        esc = _re.sub(r"\[([^\]]+)\]\((https?://[^\s)]+)\)", _mk, esc)
+
+        # 裸URLをリンク化(末尾の句読点・閉じ括弧はリンク外に残す)
+        def _bare(m):
+            u = m.group(0)
+            trail = ""
+            while u and u[-1] in ".,;:)\"'":
+                trail = u[-1] + trail
+                u = u[:-1]
+            return f'<a href="{u}">{u}</a>{trail}'
+        esc = _re.sub(r"https?://[!-~]+", _bare, esc)
+        return _re.sub("\x00(\\d+)\x00", lambda m: anchors[int(m.group(1))], esc)
+
+    for line in md.splitlines():
+        esc = _inline(html.escape(line))
         if esc.startswith("# "):
             out.append(f"<h1>{esc[2:]}</h1>")
         elif esc.startswith("### "):
