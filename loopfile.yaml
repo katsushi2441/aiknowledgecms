@@ -62,9 +62,9 @@ digests:
   - name: kuragev
     kind: kuragev
     label: Kurage AIショート動画
-    api: http://127.0.0.1:18303/jobs?limit=20
+    api: http://127.0.0.1:18303/jobs?limit=50   # 多い日は30本/日追加されるため多めに巡回
     public_base: "https://kurage.exbridge.jp/kuragev.php?id="
-    per_day: 1
+    per_day: 3        # 1記事=最大10本 × 最大3記事/日 = 30本/日まで消化
     max_items: 10
   - name: youtube
     kind: youtube_rss

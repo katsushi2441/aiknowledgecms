@@ -23,12 +23,13 @@ def pick_videos(conn, source: str, limit: int):
         (f"video:{source}", limit)).fetchall()
 
 
-def build_prompt(dcfg: dict, videos) -> str:
+def build_prompt(dcfg: dict, videos, seq: int = 1) -> str:
     site_label = dcfg.get("label", dcfg["name"])
     lines = "\n".join(
         f"- タイトル: {v['title']}\n  URL: {v['url']}\n  サマリ: {v['summary'] or '(なし)'}"
         for v in videos)
     today = time.strftime("%Y年%m月%d日")
+    seq_note = f"と「その{seq}」" if seq > 1 else ""
     return f"""あなたは技術メディア「AIKnowledgeCMS」の記事ライターです。
 {site_label}に新しく公開された動画のダイジェスト(紹介)記事を書いてください。
 
@@ -45,7 +46,7 @@ def build_prompt(dcfg: dict, videos) -> str:
 - 最後に「## 参考」を置き、紹介した動画のURLを列挙する。
 
 # 出力形式(厳守・この形式以外を出力しない)
-TITLE: <「{today}」と「{site_label}」を含む30〜60字のタイトル>
+TITLE: <「{today}」{seq_note}と「{site_label}」を含む30〜60字のタイトル>
 SLUG: digest-{dcfg['name']}-{time.strftime('%Y%m%d')}
 ---
 <本文markdown>
@@ -58,7 +59,19 @@ def generate(cfg: dict, conn, tick_id: int, dcfg: dict) -> dict | None:
     if not videos:
         return None
 
-    prompt = build_prompt(dcfg, videos)
+    # slugはテンプレで固定(LLMの出力に依存しない)。同日2本目以降は -2, -3 と続番。
+    base_slug = f"digest-{dcfg['name']}-{time.strftime('%Y%m%d')}"
+    slug, seq = base_slug, 1
+    while True:
+        conn.execute("DELETE FROM content WHERE slug=? AND status!='published'", (slug,))
+        if not conn.execute("SELECT 1 FROM content WHERE slug=?", (slug,)).fetchone():
+            break
+        seq += 1
+        if seq > int(dcfg.get("per_day", 1)):
+            return None  # 本日分は発行済み
+        slug = f"{base_slug}-{seq}"
+
+    prompt = build_prompt(dcfg, videos, seq=seq)
     raw = _llm(cfg["create"]["generator"], cfg.get("agent_cli", ""), prompt,
                ollama_api=cfg["create"].get("ollama_api", DEFAULT_OLLAMA))
     parsed = parse_output(raw)
@@ -66,12 +79,6 @@ def generate(cfg: dict, conn, tick_id: int, dcfg: dict) -> dict | None:
         state.record(conn, tick_id, NAME, "digest_parse_error", 1,
                      {"source": dcfg["name"], "raw": raw[:500]})
         return None
-
-    # slugはテンプレで固定(LLMの出力に依存しない)
-    slug = f"digest-{dcfg['name']}-{time.strftime('%Y%m%d')}"
-    conn.execute("DELETE FROM content WHERE slug=? AND status!='published'", (slug,))
-    if conn.execute("SELECT 1 FROM content WHERE slug=?", (slug,)).fetchone():
-        return None  # 今日の分は公開済み
 
     src_urls = [v["url"] for v in videos]
     if "## 参考" not in parsed["body"] and "##参考" not in parsed["body"]:
