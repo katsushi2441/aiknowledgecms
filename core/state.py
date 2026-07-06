@@ -124,6 +124,14 @@ def latest_value(conn, key: str, before_tick: int | None = None):
     return None if row is None else row["value"]
 
 
+def value_before(conn, key: str, cutoff: str):
+    """cutoff時刻("YYYY-mm-dd HH:MM:SS")以前の最新観測値(24h前比較などに使う)。"""
+    row = conn.execute(
+        "SELECT value FROM observations WHERE key = ? AND created_at <= ?"
+        " ORDER BY id DESC LIMIT 1", (key, cutoff)).fetchone()
+    return None if row is None else row["value"]
+
+
 def open_issue(conn, tick_id: int, fingerprint: str, severity: str,
                title: str, detail: str) -> bool:
     """issueを開く/継続する。新規に開いた場合 True を返す。"""

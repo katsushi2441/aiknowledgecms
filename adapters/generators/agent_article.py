@@ -167,12 +167,101 @@ def parse_output(text: str) -> dict | None:
     }
 
 
+def build_refresh_prompt(cfg: dict, article, metrics_summary: str, sources) -> str:
+    """既存記事のリライト用プロンプト。素材=元記事本文+元記事の参照URL。"""
+    src_lines = "\n".join(
+        f"- {s['title']}\n  URL: {s['url']}\n  概要: {s['summary'] or '(なし)'}"
+        for s in sources) or "(なし)"
+    return f"""あなたは技術メディア「AIKnowledgeCMS」の記事ライターです。
+以下の既存記事を、検索パフォーマンスを改善する目的でリライトしてください。
+
+# 検索パフォーマンス(Google Search Console実測)
+{metrics_summary}
+
+# 既存記事タイトル
+{article['title']}
+
+# 既存記事本文
+{article['body_md']}
+
+# 参照可能な素材(元記事が根拠にした情報)
+{src_lines}
+
+# リライト方針
+- 冒頭の1段落で検索者の疑問に直接答える(結論先出し)。
+- タイトルは検索クエリの語を含めつつ、内容が具体的に伝わるよう改善してよい。
+- 見出し(##)で構造を明確にし、900〜1600字に整える。
+- 既存記事と素材にある事実だけを使う。新しい事実・数字・日付を創作しない。
+- 記事内で参照するURLは上記素材のURLのみ使用可。
+- 最後に「## 参考」を置き、使った素材URLを列挙(無ければ「- 一般的な技術解説です」と1行)。
+
+# 出力形式(厳守・この形式以外を出力しない)
+TITLE: <30〜60字の記事タイトル>
+SLUG: {article['slug']}
+---
+<本文markdown>
+"""
+
+
+def generate_refresh(cfg: dict, conn, tick_id: int, refresh_row) -> dict | None:
+    """リライト候補(refresh://slug/YYYYMM)から既存記事の改稿ドラフトを作る。
+
+    ゲート不合格で公開中の記事を巻き込まないよう、一時slug({slug}--r)の
+    contentドラフト行を作って検証させ、合格後にmaybe_create側で本体へ反映する。
+    """
+    slug = refresh_row["url"].removeprefix("refresh://").split("/")[0]
+    article = conn.execute(
+        "SELECT slug, title, body_md, sources FROM content"
+        " WHERE slug=? AND status='published'", (slug,)).fetchone()
+    if article is None:
+        conn.execute("UPDATE research SET used=1 WHERE id=?", (refresh_row["id"],))
+        conn.commit()
+        state.record(conn, tick_id, NAME, "refresh_skipped", 1,
+                     {"slug": slug, "reason": "published記事なし"})
+        return None
+
+    src_urls = [u for u in json.loads(article["sources"] or "[]")
+                if u.startswith("http")]
+    sources = []
+    if src_urls:
+        sources = conn.execute(
+            "SELECT * FROM research WHERE url IN ({})".format(
+                ",".join("?" * len(src_urls))), src_urls).fetchall()
+
+    prompt = build_refresh_prompt(cfg, article, refresh_row["summary"] or "", sources)
+    raw = _llm(cfg["create"]["generator"], cfg.get("agent_cli", ""), prompt,
+               ollama_api=cfg["create"].get("ollama_api", DEFAULT_OLLAMA))
+    parsed = parse_output(raw)
+    if parsed is None:
+        state.record(conn, tick_id, NAME, "refresh_parse_error", 1, {"raw": raw[:500]})
+        return None
+
+    tmp_slug = f"{slug[:46]}--r"
+    conn.execute("DELETE FROM content WHERE slug=?", (tmp_slug,))
+    if "## 参考" not in parsed["body"] and "##参考" not in parsed["body"]:
+        refs = "\n".join(f"- {u}" for u in src_urls) or "- 一般的な技術解説です"
+        parsed["body"] = parsed["body"].rstrip() + f"\n\n## 参考\n{refs}\n"
+    conn.execute(
+        "INSERT INTO content (slug, title, status, body_md, sources, created_tick, created_at)"
+        " VALUES (?, ?, 'draft', ?, ?, ?, ?)",
+        (tmp_slug, parsed["title"][:120], parsed["body"],
+         json.dumps(src_urls, ensure_ascii=False), tick_id, state.now()))
+    conn.commit()
+    return {"slug": tmp_slug, "real_slug": slug, "refresh": True,
+            "title": parsed["title"], "body": parsed["body"],
+            "sources": src_urls, "source_ids": [refresh_row["id"]]}
+
+
 def generate(cfg: dict, conn, tick_id: int) -> dict | None:
     """ドラフトを1本生成してcontentにdraftとして保存する。素材が無ければNone。"""
     sources = pick_sources(conn)
     if not sources:
         state.record(conn, tick_id, NAME, "create_skipped", 1, {"reason": "no_research"})
         return None
+
+    # リライト候補が最優先のときはrefreshモード
+    if sources and sources[0]["url"].startswith("refresh://"):
+        return generate_refresh(cfg, conn, tick_id, sources[0])
 
     # クエリ起点のときは「1クエリ + GitHub実データ接地」に絞る。
     # 接地できないクエリは創作記事になるため書かず、使用済みにしてRSS素材へフォールバック。

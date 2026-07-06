@@ -32,6 +32,18 @@ def _latest(conn, key: str):
     return None if r is None else r["value"]
 
 
+def _latest_meta(conn, key: str):
+    r = conn.execute(
+        "SELECT meta FROM observations WHERE key=? AND meta IS NOT NULL"
+        " ORDER BY id DESC LIMIT 1", (key,)).fetchone()
+    if r is None:
+        return None
+    try:
+        return json.loads(r["meta"])
+    except Exception:
+        return None
+
+
 def _line_chart(new_pts, all_pts) -> str:
     """2系列の折れ線SVG。細いマーク・控えめグリッド・線端に直接ラベル。"""
     W, H, PL, PR, PT, PB = 660, 220, 44, 88, 14, 26
@@ -135,9 +147,26 @@ def build(cfg: dict, conn, tick_id: int) -> str:
         for i in issues) or '<li class="ok">開いている課題はありません 🎉</li>'
 
     queries = conn.execute(
-        "SELECT title FROM research WHERE source='gsc_opportunity' AND used=0"
-        " ORDER BY score DESC LIMIT 3").fetchall()
+        "SELECT title FROM research WHERE source IN ('gsc_opportunity','gsc_refresh')"
+        " AND used=0 ORDER BY score DESC LIMIT 3").fetchall()
     q_html = "".join(f"<li>{html.escape(q['title'])}</li>" for q in queries) or "<li>蓄積中</li>"
+
+    # 記事別成績 (Phase 4 MEASURE — GSC 28日実測)
+    art_meta = _latest_meta(conn, "article_metrics") or {}
+    art_rows = ""
+    for m in (art_meta.get("articles") or [])[:10]:
+        t = conn.execute("SELECT title FROM content WHERE slug=?",
+                         (m["slug"],)).fetchone()
+        label = (t["title"] if t else m["slug"])[:34]
+        art_rows += (
+            f'<tr><td style="text-align:left">'
+            f'<a href="articles/{html.escape(m["slug"])}.html">{html.escape(label)}</a></td>'
+            f'<td>{int(m["impressions"])}</td><td>{int(m["clicks"])}</td>'
+            f'<td>{m["ctr"]:.1%}</td><td>{m["position"]:.1f}</td></tr>')
+    art_metrics_html = (
+        f'<table style="width:100%"><tr><th style="text-align:left">記事</th>'
+        f'<th>表示</th><th>クリック</th><th>CTR</th><th>平均順位</th></tr>{art_rows}</table>'
+        if art_rows else '<div class="empty">GSCに記事ページの計測が届くと表示されます</div>')
 
     updated = state.now()
     return f"""<!doctype html>
@@ -204,6 +233,10 @@ li a{{color:var(--accent);text-decoration:none;font-weight:600}}
   <div class="card"><h2>課題キュー / 次に狙う検索クエリ</h2>
     <ul>{issues_html}</ul>
     <h2 style="margin-top:14px">Next Targets</h2><ul>{q_html}</ul></div>
+</div>
+<div class="card">
+  <h2>記事別成績 — Google検索 28日間 (MEASURE)</h2>
+  {art_metrics_html}
 </div>
 <div class="foot">生成: AIKnowledgeCMS Growth Loop (LLM非使用・自DB実測) — <a href="https://github.com/katsushi2441/aiknowledgecms" style="color:var(--accent)">GitHub</a></div>
 </div></body></html>

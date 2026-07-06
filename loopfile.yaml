@@ -22,6 +22,12 @@ gsc:
   auth: gcloud   # kgrowthと同じADC認証(quota projectはADCファイルから自動取得)
   property: https://aiknowledgecms.exbridge.jp/
   opportunity_min_impressions: 20
+  # Phase 4 (MEASURE)
+  position_band_min_impressions: 10  # 2ページ目(11-20位)機会検知の最低表示回数
+  track_min_impressions: 20          # 順位を追跡するクエリの最低表示回数
+  position_drop_threshold: 5         # この順位数以上落ちたらTRIAGEへ
+  refresh_min_age_days: 7            # リライト対象は公開からこの日数以上
+  refresh_min_impressions: 30        # リライト対象の最低表示回数
 
 # RESEARCH: コレクタ(毎tick・軽量)
 research:
@@ -68,6 +74,7 @@ simpletrack:
 thresholds:
   pv_drop_pct: 30        # 前tick比でこの%以上PVが落ちたらissue
   slow_page_ms: 4000     # 応答がこれより遅いページはissue
+  gsc_clicks_drop_pct: 20  # GSCクリック28d合計が24h前比この%以上減でissue (Phase 4)
 
 # DISTRIBUTE
 publisher:

@@ -84,6 +84,41 @@ def triage(cfg: dict, conn, tick_id: int, sensed: dict) -> dict:
         else:
             _resolve("pv_drop")
 
+    # GSCクリック減 (24時間前比 / Phase 4 MEASURE) — 28日移動合計なので
+    # 前tick比ではほぼ動かない。1日前の値と比較する。
+    gs = sensed.get("gsc")
+    if gs is not None and not gs.get("skipped"):
+        import time as _time
+        cutoff = _time.strftime("%Y-%m-%d %H:%M:%S",
+                                _time.localtime(_time.time() - 86400))
+        prev24 = state.value_before(conn, "gsc_clicks_28d", cutoff)
+        cur_clicks = gs.get("clicks_28d", 0)
+        clicks_drop_pct = int(th.get("gsc_clicks_drop_pct", 20))
+        if (prev24 is not None and prev24 >= 20
+                and cur_clicks < prev24 * (1 - clicks_drop_pct / 100)):
+            _open("gsc_clicks_drop", "warning",
+                  f"GSCクリック減: 28d合計が24hで {int(prev24)} → {int(cur_clicks)}"
+                  f" ({clicks_drop_pct}%閾値超え)",
+                  json.dumps({"prev24h": prev24, "cur": cur_clicks}))
+        else:
+            _resolve("gsc_clicks_drop")
+
+        # 追跡クエリの順位下落 (センサが検出済みのものをissue化)
+        drops = gs.get("position_drops", [])
+        dropped_fps = set()
+        for d in drops:
+            fp = f"pos_drop:{d['query']}"
+            dropped_fps.add(fp)
+            _open(fp, "warning",
+                  f"順位下落: 「{d['query']}」が {d['prev']} → {d['cur']} 位",
+                  json.dumps(d, ensure_ascii=False))
+        # 今回下落していない既存のpos_drop issueは解消扱い
+        for row in conn.execute(
+                "SELECT fingerprint FROM issues WHERE status='open'"
+                " AND fingerprint LIKE 'pos_drop:%'").fetchall():
+            if row["fingerprint"] not in dropped_fps:
+                _resolve(row["fingerprint"])
+
     conn.commit()
     return {"opened": opened, "resolved": resolved}
 
@@ -133,17 +168,37 @@ def maybe_create(cfg: dict, conn, tick_id: int, dry_run: bool,
             (gate.get("verifier") or {}).get("reason", "verifier FAIL")]
         result["rejected"] = {"title": draft["title"], "reasons": reasons}
         state.record(conn, tick_id, "create", "article_rejected", 1,
-                     {"slug": draft["slug"], "reasons": reasons})
+                     {"slug": draft["slug"], "reasons": reasons,
+                      "refresh": bool(draft.get("refresh"))})
         return result
+
+    if draft.get("refresh"):
+        # 合格した改稿を公開中の本体行へ反映し、一時ドラフト行を消す。
+        # (ゲート不合格時はここに来ないので、公開中の記事は無傷のまま)
+        real = draft["real_slug"]
+        conn.execute(
+            "UPDATE content SET title=?, body_md=?,"
+            " gate_result=(SELECT gate_result FROM content WHERE slug=?)"
+            " WHERE slug=?",
+            (draft["title"][:120], draft["body"], draft["slug"], real))
+        conn.execute("DELETE FROM content WHERE slug=?", (draft["slug"],))
+        conn.commit()
+        draft = {**draft, "slug": real}
 
     from adapters.publishers import articles_ftp
     url = articles_ftp.publish(cfg, conn, draft, gate)
-    announced = announce_all(cfg, conn, tick_id, draft["title"], url, draft["body"])
+    if draft.get("refresh"):
+        # リライトは既知の記事の更新なのでSNS等への再告知はしない
+        announced = {}
+    else:
+        announced = announce_all(cfg, conn, tick_id, draft["title"], url, draft["body"])
     state.record(conn, tick_id, "create", "article_published", 1,
                  {"slug": draft["slug"], "url": url,
-                  "announced": list(announced.keys())})
+                  "announced": list(announced.keys()),
+                  "refresh": bool(draft.get("refresh"))})
     result["published"] = {"title": draft["title"], "url": url,
-                           "announced": announced}
+                           "announced": announced,
+                           "refresh": bool(draft.get("refresh"))}
     return result
 
 
@@ -222,7 +277,8 @@ def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run, researched=Non
             pub = created["published"]
             ann = pub.get("announced") or {}
             ann_s = "/".join(ann.keys()) if isinstance(ann, dict) else str(ann)
-            lines.append(f"- ✅ 記事を公開: [{pub['title']}]({pub['url']})"
+            verb = "記事をリライト公開" if pub.get("refresh") else "記事を公開"
+            lines.append(f"- ✅ {verb}: [{pub['title']}]({pub['url']})"
                          + (f" (配信: {ann_s})" if ann_s else ""))
         elif created.get("rejected"):
             rej = created["rejected"]

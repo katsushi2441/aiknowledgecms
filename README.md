@@ -27,10 +27,11 @@ SENSE → RESEARCH → TRIAGE → ACT → CREATE → DISTRIBUTE
 |---|---|---|
 | SENSE | Analytics / Search Console / access logs / uptime become structured observations | ✅ Phase 1 |
 | RESEARCH | Collector adapters gather trends and sources | ✅ Phase 2 |
-| TRIAGE | Observations become a prioritized issue queue | ✅ Phase 1 (rule-based) |
-| ACT | Playbook-driven fixes; site changes land as worktree PRs | Phase 3 |
-| CREATE | Content generation behind quality gates (separate verifier agent) | ✅ Phase 2 |
+| TRIAGE | Observations become a prioritized issue queue (uptime, PV, rank drops, click drops) | ✅ Phase 1+4 (rule-based) |
+| ACT | Playbook-driven fixes; site changes land as worktree PRs | Phase 5 |
+| CREATE | Content generation behind quality gates (separate verifier agent) + content refresh | ✅ Phase 2+4 |
 | DISTRIBUTE | Publisher / announcer adapters ship the output | ✅ Phase 2 (articles + reports + AIxSNS) |
+| MEASURE | Per-article search metrics feed back into what to write / rewrite next | ✅ Phase 4 |
 
 ## Quick start (Phase 1)
 
@@ -99,9 +100,13 @@ The loop that runs this repository publishes its own execution reports at
 
 - **Phase 0** — Concept & spec (done)
 - **Phase 1** — Core tick runner + SENSE / TRIAGE / REPORT (done, running hourly)
-- **Phase 2** — CREATE / DISTRIBUTE adapters + quality gates ← **you are here**
-  (first gated article published autonomously: [/articles/](https://aiknowledgecms.exbridge.jp/articles/))
-- **Phase 3** — ACT via worktrees + shareable growth cards / dashboards
+- **Phase 2** — CREATE / DISTRIBUTE adapters + quality gates (done —
+  gated articles published autonomously: [/articles/](https://aiknowledgecms.exbridge.jp/articles/))
+- **Phase 3** — GSC opportunity-driven articles + weekly primary-data reports +
+  live [/dashboard](https://aiknowledgecms.exbridge.jp/dashboard.html) (done)
+- **Phase 4** — MEASURE: per-article search metrics, page-2 (rank 11–20) opportunity
+  mining, rank/click drop alerts, gated content refresh ← **you are here**
+- **Phase 5** — ACT via worktrees (the loop patches its own site code as PRs)
 
 ## License
 
