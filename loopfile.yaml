@@ -55,6 +55,24 @@ create:
     AIエージェント経済(エージェントに仕事をさせて稼ぐ・x402/MCP/A2A・
     AIによる収益化・自律エージェントの実務応用)についての短い考察記事。
 
+# DIGEST: 外部サイト監視→新着紹介記事(拡散ハブ)。1日1本/ソース。
+# 素材はvideosコレクタが毎tick収集し、researchのURL一意性で重複防止。
+# 未紹介分は古い順に最大max_items本ずつ記事化して前進していく。
+digests:
+  - name: kuragev
+    kind: kuragev
+    label: Kurage AIショート動画
+    api: http://127.0.0.1:18303/jobs?limit=20
+    public_base: "https://kurage.exbridge.jp/kuragev.php?id="
+    per_day: 1
+    max_items: 10
+  - name: youtube
+    kind: youtube_rss
+    label: KurageプロジェクトのYouTubeチャンネル
+    feed: https://www.youtube.com/feeds/videos.xml?channel_id=UCL2iSxgzwm5frZNjIfiTauA
+    per_day: 1
+    max_items: 10
+
 http_health:
   watch_pages:
     - /

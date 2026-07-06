@@ -105,7 +105,9 @@ The loop that runs this repository publishes its own execution reports at
 - **Phase 3** — GSC opportunity-driven articles + weekly primary-data reports +
   live [/dashboard](https://aiknowledgecms.exbridge.jp/dashboard.html) (done)
 - **Phase 4** — MEASURE: per-article search metrics, page-2 (rank 11–20) opportunity
-  mining, rank/click drop alerts, gated content refresh ← **you are here**
+  mining, rank/click drop alerts, gated content refresh, and the spread-hub role —
+  the loop watches external Kurage properties (kuragev short videos, the YouTube
+  channel) and publishes daily gated digest articles that link out to them ← **you are here**
 - **Phase 5** — ACT via worktrees (the loop patches its own site code as PRs)
 
 ## License

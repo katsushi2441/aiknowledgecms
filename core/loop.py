@@ -140,11 +140,14 @@ def maybe_create(cfg: dict, conn, tick_id: int, dry_run: bool,
         return result
 
     today = state.now()[:10]
+    # digest-記事は別予算(maybe_digest)なので通常記事の予算から除外する
     published_today = conn.execute(
-        "SELECT COUNT(*) FROM content WHERE status='published' AND published_at LIKE ?",
+        "SELECT COUNT(*) FROM content WHERE status='published' AND published_at LIKE ?"
+        " AND slug NOT LIKE 'digest-%'",
         (today + "%",)).fetchone()[0]
     attempts_today = conn.execute(
-        "SELECT COUNT(*) FROM content WHERE created_at LIKE ?", (today + "%",)).fetchone()[0]
+        "SELECT COUNT(*) FROM content WHERE created_at LIKE ?"
+        " AND slug NOT LIKE 'digest-%'", (today + "%",)).fetchone()[0]
     if not force:
         if published_today >= int(cc.get("articles_per_day", 1)):
             result["skipped"] = f"日次予算達成(published={published_today})"
@@ -204,18 +207,20 @@ def maybe_create(cfg: dict, conn, tick_id: int, dry_run: bool,
 
 # ---------------------------------------------------------------- announce
 def announce_all(cfg: dict, conn, tick_id: int, title: str, url: str,
-                 body_md: str, kind: str = "article") -> dict:
+                 body_md: str, kind: str = "article",
+                 names: list[str] | None = None) -> dict:
     """loopfileのannouncersに列挙されたチャネルへ配信。失敗しても他は続行。
 
     kind="article": はてな/Bloggerへはチャネル別の衛星記事(別内容+バックリンク)。
     kind="report": 数値改変を避けて原文転載。
+    names: チャネルの明示指定(digestは動画から動画を作らないようkurage_videoを外す等)。
     """
     from adapters.announcers import aixsns, hatena_blogger, kurage_video
     channels = {"aixsns": lambda: aixsns.announce(cfg, title, url),
                 "hatena_blogger": lambda: hatena_blogger.announce(cfg, title, url, body_md, kind=kind),
                 "kurage_video": lambda: kurage_video.announce(cfg, title, url, body_md)}
     results = {}
-    for name in cfg.get("announcers", ["aixsns"]):
+    for name in (names if names is not None else cfg.get("announcers", ["aixsns"])):
         fn = channels.get(name)
         if fn is None:
             continue
@@ -226,6 +231,59 @@ def announce_all(cfg: dict, conn, tick_id: int, title: str, url: str,
         state.record(conn, tick_id, "distribute", f"announce_{name}", 1,
                      results[name] if isinstance(results[name], dict) else {})
     conn.commit()
+    return results
+
+
+def maybe_digest(cfg: dict, conn, tick_id: int, dry_run: bool) -> list[dict]:
+    """外部動画サイトの新着ダイジェスト記事(1日1本/ソース)。拡散ハブの役割。
+
+    素材はvideosコレクタが積んだresearch(video:{name})。既存の品質ゲートを通し、
+    合格したものだけ公開する。動画から動画を作る循環を避けるため
+    kurage_videoアナウンサには流さない。
+    """
+    results: list[dict] = []
+    if dry_run:
+        return results
+    today = state.now()[:10]
+    for dcfg in cfg.get("digests", []):
+        name = dcfg["name"]
+        if int(dcfg.get("per_day", 1)) < 1:
+            continue
+        already = conn.execute(
+            "SELECT COUNT(*) FROM content WHERE slug LIKE ? AND status='published'"
+            " AND published_at LIKE ?",
+            (f"digest-{name}-%", today + "%")).fetchone()[0]
+        if already >= int(dcfg.get("per_day", 1)):
+            continue
+        try:
+            from adapters.generators import video_digest
+            from gates import verify_article
+            draft = video_digest.generate(cfg, conn, tick_id, dcfg)
+            if draft is None:
+                continue
+            gate = verify_article.run(cfg, conn, draft)
+            if not gate["passed"]:
+                reasons = gate["problems"] or [
+                    (gate.get("verifier") or {}).get("reason", "verifier FAIL")]
+                state.record(conn, tick_id, "digest", "digest_rejected", 1,
+                             {"source": name, "slug": draft["slug"], "reasons": reasons})
+                results.append({"source": name, "rejected": draft["title"],
+                                "reasons": reasons})
+                continue
+            from adapters.publishers import articles_ftp
+            url = articles_ftp.publish(cfg, conn, draft, gate)
+            announced = announce_all(cfg, conn, tick_id, draft["title"], url,
+                                     draft["body"],
+                                     names=["aixsns", "hatena_blogger"])
+            state.record(conn, tick_id, "digest", "digest_published", 1,
+                         {"source": name, "slug": draft["slug"], "url": url,
+                          "videos": len(draft["sources"])})
+            results.append({"source": name, "published": draft["title"],
+                            "url": url, "videos": len(draft["sources"])})
+        except Exception:
+            traceback.print_exc()
+            state.record(conn, tick_id, "digest", "digest_error", 1,
+                         {"source": name, "error": traceback.format_exc()[-400:]})
     return results
 
 
@@ -249,7 +307,8 @@ def maybe_weekly_report(cfg: dict, conn, tick_id: int, dry_run: bool) -> dict | 
 
 
 # ---------------------------------------------------------------- report
-def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run, researched=None, created=None) -> str:
+def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run, researched=None,
+                    created=None, digests=None) -> str:
     lines = [f"# Loop Report — tick {tick_id}", ""]
     lines.append(f"- 実行時刻: {state.now()}")
     lines.append(f"- モード: {'dry-run' if dry_run else 'live'}")
@@ -292,6 +351,14 @@ def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run, researched=Non
                 lines.append(f"  - {r}")
         else:
             lines.append(f"- スキップ: {created.get('skipped', '-')}")
+        lines.append("")
+    if digests:
+        lines.append("## DIGEST (拡散ハブ)")
+        for d in digests:
+            if d.get("published"):
+                lines.append(f"- ✅ {d['source']}: [{d['published']}]({d['url']}) ({d['videos']}本を紹介)")
+            else:
+                lines.append(f"- 🛑 {d['source']}: ゲート不合格 {d.get('rejected', '')}")
         lines.append("")
     lines.append("## TRIAGE")
     lines.append(f"- 新規/再発 issue: {len(triaged['opened'])}")
@@ -490,6 +557,16 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
             print("  RESEARCH: FAILED")
             traceback.print_exc()
 
+    # RESEARCH: 監視中の動画サイト(拡散ハブの素材)
+    if cfg.get("digests"):
+        try:
+            from adapters.collectors import videos
+            vres = videos.collect(cfg, conn, tick_id)
+            print(f"  RESEARCH videos: +{vres['added']} ({vres['per_source']})")
+        except Exception:
+            print("  RESEARCH videos: FAILED")
+            traceback.print_exc()
+
     # TRIAGE
     triaged = triage(cfg, conn, tick_id, sensed)
     print(f"  TRIAGE: opened={len(triaged['opened'])} resolved={len(triaged['resolved'])}")
@@ -511,6 +588,19 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
     else:
         print(f"  CREATE: skip ({created.get('skipped')})")
 
+    # DIGEST: 外部動画サイトの新着紹介記事(1日1本/ソース)
+    digests = []
+    try:
+        digests = maybe_digest(cfg, conn, tick_id, dry_run)
+        for d in digests:
+            if d.get("published"):
+                print(f"  DIGEST {d['source']}: published {d['url']} ({d['videos']}本)")
+            else:
+                print(f"  DIGEST {d['source']}: rejected ({d.get('reasons', [])[:2]})")
+    except Exception:
+        print("  DIGEST: FAILED")
+        traceback.print_exc()
+
     # 週次一次データレポート(期日が来ていれば)
     try:
         weekly = maybe_weekly_report(cfg, conn, tick_id, dry_run)
@@ -522,7 +612,8 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
 
     # REPORT
     report_md = build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run,
-                                researched=researched, created=created)
+                                researched=researched, created=created,
+                                digests=digests)
     REPORTS.mkdir(exist_ok=True)
     (REPORTS / f"tick-{tick_id}.md").write_text(report_md, encoding="utf-8")
 

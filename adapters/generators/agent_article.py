@@ -90,9 +90,13 @@ def _enrich_query(conn, tick_id: int, query: str) -> list:
 
 
 def pick_sources(conn, n: int = 3):
-    """未使用のresearchからスコア・新しさ順に題材を選ぶ。"""
+    """未使用のresearchからスコア・新しさ順に題材を選ぶ。
+
+    video:% はvideo_digest専用の素材なので通常記事には使わない。
+    """
     return conn.execute(
-        "SELECT * FROM research WHERE used = 0 ORDER BY score DESC, id DESC LIMIT ?",
+        "SELECT * FROM research WHERE used = 0 AND source NOT LIKE 'video:%'"
+        " ORDER BY score DESC, id DESC LIMIT ?",
         (n,),
     ).fetchall()
 

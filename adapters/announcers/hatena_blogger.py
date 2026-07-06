@@ -81,13 +81,17 @@ TITLE: <タイトル>
         return None
     v = {"title": m.group("title").strip()[:80], "body": m.group("body").strip()}
 
-    # ルール検査(決定的): 長さ・タイトル・URLは元記事のみ許可
+    # ルール検査(決定的): 長さ・タイトル・URL許可リスト。
+    # 許可URL = 元記事URL + 元記事本文に出てくるURL(動画ダイジェストの
+    # 動画リンク等はゲート通過済みの本文由来なので衛星記事でも引用可)。
     if not (10 <= len(v["title"]) <= 80):
         return None
     if not (300 <= len(v["body"]) <= 1600):
         return None
+    allowed = {url} | {u.rstrip(".,;:)\"'）")
+                       for u in re.findall(r"https?://[!-~]+", body_md)}
     for u in re.findall(r"https?://[!-~]+", v["body"]):
-        if u.rstrip(".,;:)\"'）") != url:
+        if u.rstrip(".,;:)\"'）") not in allowed:
             return None
     if v["title"].strip() == title.strip():
         return None  # タイトルが同一なら意図を満たさない
