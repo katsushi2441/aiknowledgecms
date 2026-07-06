@@ -204,11 +204,15 @@ def maybe_create(cfg: dict, conn, tick_id: int, dry_run: bool,
 
 # ---------------------------------------------------------------- announce
 def announce_all(cfg: dict, conn, tick_id: int, title: str, url: str,
-                 body_md: str) -> dict:
-    """loopfileのannouncersに列挙されたチャネルへ配信。失敗しても他は続行。"""
+                 body_md: str, kind: str = "article") -> dict:
+    """loopfileのannouncersに列挙されたチャネルへ配信。失敗しても他は続行。
+
+    kind="article": はてな/Bloggerへはチャネル別の衛星記事(別内容+バックリンク)。
+    kind="report": 数値改変を避けて原文転載。
+    """
     from adapters.announcers import aixsns, hatena_blogger, kurage_video
     channels = {"aixsns": lambda: aixsns.announce(cfg, title, url),
-                "hatena_blogger": lambda: hatena_blogger.announce(cfg, title, url, body_md),
+                "hatena_blogger": lambda: hatena_blogger.announce(cfg, title, url, body_md, kind=kind),
                 "kurage_video": lambda: kurage_video.announce(cfg, title, url, body_md)}
     results = {}
     for name in cfg.get("announcers", ["aixsns"]):
@@ -237,7 +241,8 @@ def maybe_weekly_report(cfg: dict, conn, tick_id: int, dry_run: bool) -> dict | 
     draft = weekly_report.generate(cfg, conn, tick_id)
     gate = {"verifier": {"model": "deterministic(自DB実測)"}}
     url = articles_ftp.publish(cfg, conn, draft, gate)
-    announced = announce_all(cfg, conn, tick_id, draft["title"], url, draft["body"])
+    announced = announce_all(cfg, conn, tick_id, draft["title"], url, draft["body"],
+                             kind="report")
     state.record(conn, tick_id, "create", "weekly_report_published", 1,
                  {"url": url, "announced": list(announced.keys())})
     return {"title": draft["title"], "url": url, "announced": announced}
