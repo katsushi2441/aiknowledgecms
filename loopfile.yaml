@@ -4,7 +4,7 @@
 site: https://aiknowledgecms.exbridge.jp
 env_file: /home/kojima/work/aixec/.env   # FTP_* / SMTP_* を読む(値はコミットしない)
 
-kpi: [pv_new_24h, uniq_ips_new_24h, pages_healthy]  # 新システムのみ(旧システム遺産PVは参考値)
+kpi: [pv_new_24h, uniq_ips_new_24h, pages_healthy, kurage_clicks_sent_24h]  # 新システムのみ(旧システム遺産PVは参考値)
 
 cadence:
   sense: hourly       # systemd timer が起動する(コード側は表示用)
@@ -12,7 +12,7 @@ cadence:
   act: weekly         # Phase 3
 
 # SENSE: 有効なセンサ
-sensors: [http_health, simpletrack, gsc]
+sensors: [http_health, simpletrack, gsc, kurage_clicks]
 
 # GSC(Search Console)センサ — 集客ループの心臓部。
 # credentials_file が無い間は自動スキップ。設定手順:
@@ -64,6 +64,7 @@ digests:
     label: Kurage AIショート動画
     api: http://127.0.0.1:18303/jobs?limit=50   # 多い日は30本/日追加されるため多めに巡回
     public_base: "https://kurage.exbridge.jp/kuragev.php?id="
+    link_ref: akc     # 記事内の動画リンクに ?ref=akc を付けて送客を計測する
     per_day: 3        # 1記事=最大10本 × 最大3記事/日 = 30本/日まで消化
     max_items: 10
   - name: youtube
@@ -87,6 +88,13 @@ http_health:
 simpletrack:
   ftp_log_path: /web/aiknowledgecms_exbridge_jp/access.log
   tail_bytes: 2000000   # 末尾2MBだけFTPで取得して解析(全量DLしない)
+
+# 送客KPI: kurage.exbridge.jp側のaccess.logから、当サイト発の動画クリックを測る。
+# ref=akc(ダイジェスト記事) / ref=akc-w(最新動画ウィジェット) を区別して集計。
+kurage_clicks:
+  ftp_log_path: /web/kurage_exbridge_jp/access.log
+  tail_bytes: 2000000
+  video_path: kuragev.php
 
 # TRIAGE: ルールしきい値
 thresholds:

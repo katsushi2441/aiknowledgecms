@@ -88,9 +88,11 @@ def run(cfg: dict, conn, draft: dict) -> dict:
         result["passed"] = False
         result["verifier"] = None
     else:
+        # 送客計測のref=はresearch.urlの台帳(正規形)には無いので外して引く
+        lookup = [re.sub(r"[?&]ref=[\w-]+", "", u) for u in draft["sources"]]
         rows = conn.execute(
             "SELECT title, url, summary FROM research WHERE url IN ({})".format(
-                ",".join("?" * len(draft["sources"]))), draft["sources"]).fetchall()
+                ",".join("?" * len(lookup))), lookup).fetchall()
         sources_text = "\n".join(
             f"- {r['title']} ({r['url']})\n  {r['summary'] or ''}" for r in rows)
         v = verifier_agent(cfg, draft, sources_text)

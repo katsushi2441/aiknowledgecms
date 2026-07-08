@@ -24,7 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core import loopfile, state
-from adapters.sensors import gsc, http_health, simpletrack
+from adapters.sensors import gsc, http_health, kurage_clicks, simpletrack
 from adapters.collectors import rss
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +35,7 @@ SENSORS = {
     "http_health": http_health,
     "simpletrack": simpletrack,
     "gsc": gsc,
+    "kurage_clicks": kurage_clicks,
 }
 
 
@@ -319,6 +320,13 @@ def build_report_md(cfg, conn, tick_id, sensed, triaged, dry_run, researched=Non
     lines.append(f"- pv_new_24h(新システム): **{st.get('pv_new_24h', 'n/a')}** / 全体 {st.get('pv_24h', 'n/a')}")
     lines.append(f"- uniq_ips_new_24h: **{st.get('uniq_ips_new_24h', 'n/a')}** / 全体 {st.get('uniq_ips_24h', 'n/a')}")
     lines.append(f"- pages_healthy: **{hh.get('healthy', '?')}/{hh.get('total', '?')}**")
+    kc = sensed.get("kurage_clicks")
+    if kc is not None:
+        lines.append(
+            f"- kurage動画への送客(24h): **{kc.get('sent_24h', 0)}**"
+            f" (記事 {kc.get('article_24h', 0)} / ウィジェット {kc.get('widget_24h', 0)}"
+            f" / ref無しリファラ {kc.get('referrer_only_24h', 0)})"
+            f" — 動画PV全体 {kc.get('video_pv_24h', 'n/a')}")
     lines.append("")
     if st.get("top"):
         lines.append("## 24h Top URLs")
@@ -651,6 +659,14 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
             print(f"  DASHBOARD updated: {dash_url}")
         except Exception:
             print("  DASHBOARD: FAILED")
+            traceback.print_exc()
+        try:
+            from adapters.publishers import videos_widget
+            widget_path = videos_widget.publish(cfg, conn)
+            if widget_path:
+                print(f"  WIDGET updated: {widget_path}")
+        except Exception:
+            print("  WIDGET: FAILED")
             traceback.print_exc()
         if escalate(cfg, triaged["opened"]):
             print("  ESCALATE: email sent")

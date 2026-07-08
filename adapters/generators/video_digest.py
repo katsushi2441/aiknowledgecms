@@ -23,6 +23,14 @@ def pick_videos(conn, source: str, limit: int):
         (f"video:{source}", limit)).fetchall()
 
 
+def tracked_url(url: str, ref: str) -> str:
+    """送客計測用のref=パラメータを付ける。research.urlの台帳(UNIQUE)は
+    正規形のまま保ち、記事に書くURLにだけ付与する。"""
+    if not ref:
+        return url
+    return url + ("&" if "?" in url else "?") + "ref=" + ref
+
+
 def build_prompt(dcfg: dict, videos, seq: int = 1) -> str:
     site_label = dcfg.get("label", dcfg["name"])
     lines = "\n".join(
@@ -58,6 +66,9 @@ def generate(cfg: dict, conn, tick_id: int, dcfg: dict) -> dict | None:
     videos = pick_videos(conn, dcfg["name"], int(dcfg.get("max_items", 10)))
     if not videos:
         return None
+    # 記事に書くURLへ送客計測のrefを付与(idは台帳の正規URLの行のまま)
+    ref = dcfg.get("link_ref", "")
+    videos = [dict(v, url=tracked_url(v["url"], ref)) for v in videos]
 
     # slugはテンプレで固定(LLMの出力に依存しない)。同日2本目以降は -2, -3 と続番。
     base_slug = f"digest-{dcfg['name']}-{time.strftime('%Y%m%d')}"
