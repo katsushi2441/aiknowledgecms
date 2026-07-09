@@ -12,6 +12,7 @@ research.url のUNIQUE制約が重複防止の台帳を兼ねる。
 from __future__ import annotations
 
 import json
+import re
 import urllib.request
 import xml.etree.ElementTree as ET
 
@@ -19,8 +20,32 @@ from core import state
 
 NAME = "videos"
 
+# YouTubeは同じショート動画を /shorts/{id} と /watch?v={id} の2つのURL形式で
+# 別々のフィードエントリとして配信することがある。research.urlのUNIQUE制約は
+# 文字列完全一致でしか重複を検知できず、これを見逃すとdigest記事が同じ動画を
+# 2回紹介する内容になり品質ゲートに却下される実例があった。動画IDで正規化して
+# どちらの形式でも既出なら弾く。
+_YOUTUBE_ID_RE = re.compile(r"(?:shorts/|watch\?v=)([A-Za-z0-9_-]{11})")
+
+
+def _youtube_video_id(url: str) -> str | None:
+    m = _YOUTUBE_ID_RE.search(url)
+    return m.group(1) if m else None
+
+
+def _youtube_id_already_collected(conn, video_id: str) -> bool:
+    row = conn.execute(
+        "SELECT 1 FROM research WHERE source LIKE 'video:%'"
+        " AND (url LIKE ? OR url LIKE ?) LIMIT 1",
+        (f"%shorts/{video_id}%", f"%watch?v={video_id}%"),
+    ).fetchone()
+    return row is not None
+
 
 def _insert(conn, tick_id: int, source: str, title: str, url: str, summary: str) -> bool:
+    video_id = _youtube_video_id(url)
+    if video_id and _youtube_id_already_collected(conn, video_id):
+        return False  # 同じ動画IDが別URL形式で既出
     try:
         conn.execute(
             "INSERT INTO research (tick_id, source, title, url, summary, score, created_at)"
