@@ -235,6 +235,64 @@ def announce_all(cfg: dict, conn, tick_id: int, title: str, url: str,
     return results
 
 
+def maybe_video_insight(cfg: dict, conn, tick_id: int, dry_run: bool) -> list[dict]:
+    """Kurage動画の題材を1本ずつ深掘りする単独記事(1日N本、digestとは別予算)。
+
+    video_digest(まとめ紹介・送客目的)を薄めずに、同じ動画素材から
+    「知識記事」としての厚みも作ることで、送客と自サイトSEOの両方を伸ばす。
+    tick内でmaybe_digestより先に呼ぶことで、情報量の多い動画素材を先取りする。
+    """
+    results: list[dict] = []
+    vi_cfg = cfg.get("create", {}) if cfg.get("create") else {}
+    per_day = int(vi_cfg.get("video_insight_per_day", 0))
+    if per_day < 1 or dry_run or not cfg.get("digests"):
+        return results
+    dcfg_by_name = {d["name"]: d for d in cfg.get("digests", [])}
+    today = state.now()[:10]
+    published_today = conn.execute(
+        "SELECT COUNT(*) FROM content WHERE status='published' AND published_at LIKE ?"
+        " AND slug LIKE 'insight-%'", (today + "%",)).fetchone()[0]
+    max_attempts = int(vi_cfg.get("video_insight_max_attempts_per_day", per_day * 2))
+    attempts_today = conn.execute(
+        "SELECT COUNT(*) FROM content WHERE created_at LIKE ? AND slug LIKE 'insight-%'",
+        (today + "%",)).fetchone()[0]
+    if published_today >= per_day or attempts_today >= max_attempts:
+        return results
+    try:
+        from adapters.generators import video_insight
+        from gates import verify_article
+        draft = video_insight.generate(cfg, conn, tick_id, dcfg_by_name)
+        if draft is None:
+            return results
+        # slugをinsight-接頭辞に統一(日次予算のカウントに使う)
+        if not draft["slug"].startswith("insight-"):
+            new_slug = f"insight-{draft['slug']}"[:50]
+            conn.execute("UPDATE content SET slug=? WHERE slug=?", (new_slug, draft["slug"]))
+            conn.commit()
+            draft["slug"] = new_slug
+        gate = verify_article.run(cfg, conn, draft)
+        if not gate["passed"]:
+            reasons = gate["problems"] or [
+                (gate.get("verifier") or {}).get("reason", "verifier FAIL")]
+            state.record(conn, tick_id, "video_insight", "insight_rejected", 1,
+                         {"slug": draft["slug"], "reasons": reasons})
+            results.append({"rejected": draft["title"], "reasons": reasons})
+            return results
+        from adapters.publishers import articles_ftp
+        url = articles_ftp.publish(cfg, conn, draft, gate)
+        announced = announce_all(cfg, conn, tick_id, draft["title"], url, draft["body"],
+                                 names=["aixsns", "hatena_blogger"])
+        state.record(conn, tick_id, "video_insight", "insight_published", 1,
+                     {"slug": draft["slug"], "url": url})
+        results.append({"published": draft["title"], "url": url,
+                        "announced": list(announced.keys())})
+    except Exception:
+        traceback.print_exc()
+        state.record(conn, tick_id, "video_insight", "insight_error", 1,
+                     {"error": traceback.format_exc()[-400:]})
+    return results
+
+
 def maybe_digest(cfg: dict, conn, tick_id: int, dry_run: bool) -> list[dict]:
     """外部動画サイトの新着ダイジェスト記事(1日1本/ソース)。拡散ハブの役割。
 
@@ -614,6 +672,18 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
         print(f"  CREATE: rejected ({created['rejected']['reasons'][:2]})")
     else:
         print(f"  CREATE: skip ({created.get('skipped')})")
+
+    # VIDEO INSIGHT: Kurage動画の題材を1本ずつ深掘りする単独記事(digestより先取り)
+    try:
+        insights = maybe_video_insight(cfg, conn, tick_id, dry_run)
+        for v in insights:
+            if v.get("published"):
+                print(f"  VIDEO_INSIGHT: published {v['url']}")
+            else:
+                print(f"  VIDEO_INSIGHT: rejected ({v.get('reasons', [])[:2]})")
+    except Exception:
+        print("  VIDEO_INSIGHT: FAILED")
+        traceback.print_exc()
 
     # DIGEST: 外部動画サイトの新着紹介記事(1日1本/ソース)
     digests = []
