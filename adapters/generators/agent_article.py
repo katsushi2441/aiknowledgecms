@@ -218,6 +218,26 @@ SLUG: <英小文字とハイフンのみ12〜50字>
 """
 
 
+def _strip_unknown_urls(body: str, allowed: set) -> str:
+    """素材にないURL(LLMの幻覚)を機械的に除去する。
+
+    URLホワイトリスト違反は却下理由の常連(officecliの3連続却下は全て
+    実在しないHacker NewsリンクをRe参考に混ぜたもの)。行がURLだけになる
+    場合は行ごと削除、本文中ならURL文字列だけ取り除く。
+    """
+    out = []
+    for line in body.splitlines():
+        urls = re.findall(r"https?://[!-~]+", line)
+        bad = [u for u in urls if u.rstrip(".,;:)\"'）") not in allowed]
+        if bad:
+            for u in bad:
+                line = line.replace(u, "")
+            if line.strip(" \t-*・:：()（）[]<>") == "":
+                continue
+        out.append(line)
+    return "\n".join(out)
+
+
 def parse_output(text: str) -> dict | None:
     m = re.search(
         r"TITLE:\s*(?P<title>.+?)\s*\nSLUG:\s*(?P<slug>[a-z0-9\-]+)\s*\n---\s*\n(?P<body>.+)",
@@ -331,6 +351,7 @@ def generate(cfg: dict, conn, tick_id: int) -> dict | None:
     # 他プロパティで伸びているクエリ(gscnet://)起点: 受けページを接地素材に
     # 「解説+送客」記事を書く。受けページが取得できなければ書かない。
     network_prompt = None
+    network_page_url = None
     if sources and sources[0]["url"].startswith("gscnet://"):
         top = sources[0]
         try:
@@ -352,6 +373,8 @@ def generate(cfg: dict, conn, tick_id: int) -> dict | None:
             enrich = _enrich_query(conn, tick_id, meta["query"]) or []
             network_prompt = build_network_prompt(cfg, meta, ctx, enrich)
             sources = [top] + list(enrich)
+            # 記事が必ずリンクする受けページURLはゲートのURLホワイトリストに入れる
+            network_page_url = _tracked(meta["page"])
 
     # クエリ起点のときは「1クエリ + GitHub実データ接地」に絞る。
     # 接地できないクエリは創作記事になるため書かず、使用済みにしてRSS素材へフォールバック。
@@ -389,6 +412,9 @@ def generate(cfg: dict, conn, tick_id: int) -> dict | None:
         i += 1
 
     src_urls = [s["url"] for s in sources]
+    if network_page_url:
+        src_urls.append(network_page_url)
+    parsed["body"] = _strip_unknown_urls(parsed["body"], set(src_urls))
     if "## 参考" not in parsed["body"] and "##参考" not in parsed["body"]:
         http_refs = [u for u in src_urls if u.startswith("http")]
         refs = "\n".join(f"- {u}" for u in http_refs) or "- 一般的な技術解説です"
