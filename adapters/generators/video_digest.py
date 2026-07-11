@@ -36,8 +36,9 @@ def build_prompt(dcfg: dict, videos, seq: int = 1) -> str:
     lines = "\n".join(
         f"- タイトル: {v['title']}\n  URL: {v['url']}\n  サマリ: {v['summary'] or '(なし)'}"
         for v in videos)
-    today = time.strftime("%Y年%m月%d日")
-    seq_note = f"と「その{seq}」" if seq > 1 else ""
+    # SEO方針(2026-07-11): 日付先頭の定型題は毎日ほぼ同一でGoogleに全く検索されなかった
+    # (GSC実測: digest群は表示ゼロ)。固有名詞先頭の題に変更し、日付はslugにだけ残す。
+    seq_note_rule = f"。同日{seq}本目なので1本目と別の固有名詞を選ぶ" if seq > 1 else ""
     return f"""あなたは技術メディア「AIKnowledgeCMS」の記事ライターです。
 {site_label}に新しく公開された動画のダイジェスト(紹介)記事を書いてください。
 
@@ -54,7 +55,7 @@ def build_prompt(dcfg: dict, videos, seq: int = 1) -> str:
 - 最後に「## 参考」を置き、紹介した動画のURLを列挙する。
 
 # 出力形式(厳守・この形式以外を出力しない)
-TITLE: <「{today}」{seq_note}と「{site_label}」を含む30〜60字のタイトル>
+TITLE: <新着動画の中で最も検索されそうな固有名詞(製品名・人名・出来事)を先頭に置き、「{site_label}」を末尾に含む30〜60字のタイトル。日付は入れない{seq_note_rule}>
 SLUG: digest-{dcfg['name']}-{time.strftime('%Y%m%d')}
 ---
 <本文markdown>
