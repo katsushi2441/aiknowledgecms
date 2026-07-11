@@ -178,6 +178,52 @@ def _sense_article_metrics(cfg: dict, gc: dict, conn, tick_id: int,
     return metrics
 
 
+def _inspect_index(site: str, token: str, quota_project: str, url: str) -> str:
+    """URL検査APIでcoverageState文字列を返す。"""
+    body = json.dumps({"inspectionUrl": url, "siteUrl": site}).encode()
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    if quota_project:
+        headers["X-Goog-User-Project"] = quota_project
+    req = urllib.request.Request(
+        "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect",
+        data=body, headers=headers)
+    with urllib.request.urlopen(req, timeout=60) as r:
+        res = json.loads(r.read())
+    return res["inspectionResult"]["indexStatusResult"].get("coverageState", "unknown")
+
+
+def _sense_index_states(gc: dict, conn, tick_id: int,
+                        site: str, token: str, quota_project: str,
+                        per_tick: int = 3) -> None:
+    """公開2日以上の記事を、検査が最も古いものから数本ずつURL検査する。
+
+    結果は observations の idx_state:<slug> に 1(indexed)/0(not indexed) で残し、
+    TRIAGEの not_indexed ルールとACTの再公開処置がこれを読む。
+    """
+    rows = conn.execute(
+        "SELECT slug FROM content WHERE status='published'"
+        " AND published_at <= datetime('now', 'localtime', '-2 days')"
+        " AND slug NOT LIKE 'loop-weekly%' ORDER BY id").fetchall()
+    last_seen = {
+        r["key"][len("idx_state:"):]: r["latest"] for r in conn.execute(
+            "SELECT key, MAX(created_at) latest FROM observations"
+            " WHERE key LIKE 'idx_state:%' GROUP BY key")}
+    # 未検査 → 検査が古い順
+    targets = sorted((r["slug"] for r in rows),
+                     key=lambda s: last_seen.get(s, ""))[:per_tick]
+    for slug in targets:
+        url = site.rstrip("/") + f"/articles/{slug}.html"
+        try:
+            cov = _inspect_index(site, token, quota_project, url)
+        except Exception as e:
+            state.record(conn, tick_id, NAME, "index_inspect_error", 1,
+                         {"slug": slug, "error": str(e)[:150]})
+            continue
+        indexed = 1 if "indexed" in cov.lower() and "not indexed" not in cov.lower() else 0
+        state.record(conn, tick_id, NAME, f"idx_state:{slug}", indexed,
+                     {"coverage": cov})
+
+
 def sense(cfg: dict, conn, tick_id: int) -> dict:
     gc = cfg.get("gsc", {})
     auth = None
@@ -270,6 +316,14 @@ def sense(cfg: dict, conn, tick_id: int) -> dict:
             cfg, gc, conn, tick_id, site, token, quota_project, start, end)
     except Exception as e:
         state.record(conn, tick_id, NAME, "article_metrics_error", 1,
+                     {"error": str(e)[:200]})
+
+    # 記事のインデックス状態を巡回検査(1tick数本・検査が古い記事から)。
+    # 「クロール済み・未インデックス」をTRIAGEが課題化できるようにする。
+    try:
+        _sense_index_states(gc, conn, tick_id, site, token, quota_project)
+    except Exception as e:
+        state.record(conn, tick_id, NAME, "index_inspect_error", 1,
                      {"error": str(e)[:200]})
 
     return {"impressions_28d": total_impressions, "clicks_28d": total_clicks,

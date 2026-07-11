@@ -180,6 +180,32 @@ def publish(cfg: dict, conn, draft: dict, gate: dict) -> str:
     return article_url
 
 
+def republish_one(cfg: dict, conn, slug: str) -> str | None:
+    """記事1本を現行テンプレで再公開する(ACTの未インデックス処置用)。
+
+    lastmod相当の更新と関連記事リンクの張り直しで再クロールを促す。
+    本文は変えない。一覧も更新する。
+    """
+    row = conn.execute(
+        "SELECT slug, title, body_md, published_at FROM content"
+        " WHERE slug=? AND status='published'", (slug,)).fetchone()
+    if row is None:
+        return None
+    env = cfg["_env"]
+    remote_dir = cfg["publisher"]["articles_dir"].rstrip("/")
+    site = cfg["site"].rstrip("/")
+    page = render_article(cfg, conn, row["slug"], row["title"], row["body_md"] or "",
+                          published=row["published_at"] or "",
+                          creator=cfg["create"]["generator"]["model"], verifier="-")
+    with ftplib.FTP(env["FTP_HOST"], timeout=60) as ftp:
+        ftp.login(env["FTP_USER"], env["FTP_PASS"])
+        ftp.storbinary(f"STOR {remote_dir}/{row['slug']}.html",
+                       io.BytesIO(page.encode("utf-8")))
+        ftp.storbinary(f"STOR {remote_dir}/index.html",
+                       io.BytesIO(build_index_page(conn).encode("utf-8")))
+    return f"{site}/articles/{row['slug']}.html"
+
+
 def republish_all(cfg: dict, conn) -> int:
     """公開済み全記事を現行テンプレートで再生成して上げ直す(テンプレ改修の反映用)。
 

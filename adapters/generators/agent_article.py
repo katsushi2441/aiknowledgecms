@@ -89,6 +89,67 @@ def _enrich_query(conn, tick_id: int, query: str) -> list:
         urls).fetchall()
 
 
+def _fetch_page_context(url: str, timeout: int = 15) -> dict | None:
+    """受けページのtitle/descriptionを接地素材として取る(創作防止)。"""
+    try:
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "Mozilla/5.0 (aiknowledgecms-loop)"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            text = r.read(300000).decode("utf-8", "replace")
+    except Exception:
+        return None
+    tm = re.search(r"<title[^>]*>\s*([^<]{3,200})", text)
+    dm = re.search(r'name="description"\s+content="([^"]{3,400})', text)
+    om = re.search(r'property="og:description"\s+content="([^"]{3,400})', text)
+    if not tm:
+        return None
+    return {"title": tm.group(1).strip(),
+            "description": (dm or om).group(1).strip() if (dm or om) else ""}
+
+
+def _tracked(url: str) -> str:
+    """kurage側ページへのリンクには送客計測のref=akcを付ける(既存規約)。"""
+    if "kurage.exbridge.jp" in url and "ref=" not in url:
+        return url + ("&" if "?" in url else "?") + "ref=akc"
+    return url
+
+
+def build_network_prompt(cfg: dict, meta: dict, ctx: dict, enrich) -> str:
+    """gscnet://(他プロパティで伸びている検索クエリ)起点の紹介+解説記事。"""
+    q = meta.get("query", "")
+    page_url = _tracked(meta.get("page", ""))
+    enrich_lines = "\n".join(
+        f"- {s['title']}\n  URL: {s['url']}\n  概要: {s['summary'] or '(なし)'}"
+        for s in enrich) or "(なし)"
+    stats = (f"直近7日: クリック{meta.get('clicks_7d', 0)}回・表示{meta.get('impressions_7d', 0)}回"
+             f"(前週: {meta.get('clicks_prev7d', 0)}/{meta.get('impressions_prev7d', 0)})")
+    return f"""あなたは技術メディア「AIKnowledgeCMS」の記事ライターです。
+検索クエリ「{q}」からの流入が関連サイトで伸びています({stats})。
+このクエリで検索する読者の疑問に答え、受けページへ案内する日本語記事を書いてください。
+
+# 受けページ(実在。この記事が読者を案内する先)
+- URL: {page_url}
+- ページタイトル: {ctx.get('title', '')}
+- ページ説明: {ctx.get('description', '') or '(なし)'}
+
+# 補助素材(実在の情報)
+{enrich_lines}
+
+# 執筆ルール
+- 800〜1400字。です・ます調。「{q}とは何か」に最初の段落で直接答える。
+- 受けページを本文中で必ず紹介し、上記URLをそのまま1文字も変えずリンクとして書く。
+- 受けページのタイトル・説明と補助素材にある事実だけを使う。機能・数字・日付を創作しない。
+  詳細が素材にない場合は「詳しくは紹介ページを参照」と書く。
+- 最後に「## 参考」を置き、受けページURLと使った補助素材URLを列挙する。
+
+# 出力形式(厳守・この形式以外を出力しない)
+TITLE: <「{q}」の主要な語を先頭近くに含む30〜60字のタイトル>
+SLUG: <英小文字とハイフンのみ12〜50字>
+---
+<本文markdown>
+"""
+
+
 def pick_sources(conn, n: int = 3):
     """未使用のresearchからスコア・新しさ順に題材を選ぶ。
 
@@ -267,9 +328,34 @@ def generate(cfg: dict, conn, tick_id: int) -> dict | None:
     if sources and sources[0]["url"].startswith("refresh://"):
         return generate_refresh(cfg, conn, tick_id, sources[0])
 
+    # 他プロパティで伸びているクエリ(gscnet://)起点: 受けページを接地素材に
+    # 「解説+送客」記事を書く。受けページが取得できなければ書かない。
+    network_prompt = None
+    if sources and sources[0]["url"].startswith("gscnet://"):
+        top = sources[0]
+        try:
+            meta = json.loads(top["summary"] or "{}")
+        except Exception:
+            meta = {}
+        ctx = _fetch_page_context(meta.get("page", "")) if meta.get("page") else None
+        if not meta.get("query") or ctx is None:
+            conn.execute("UPDATE research SET used=1 WHERE id=?", (top["id"],))
+            conn.commit()
+            state.record(conn, tick_id, NAME, "network_skipped_no_page", 1,
+                         {"url": top["url"]})
+            sources = [s for s in pick_sources(conn) if not s["url"].startswith("gscnet://")]
+            if not sources:
+                state.record(conn, tick_id, NAME, "create_skipped", 1,
+                             {"reason": "no_groundable_sources"})
+                return None
+        else:
+            enrich = _enrich_query(conn, tick_id, meta["query"]) or []
+            network_prompt = build_network_prompt(cfg, meta, ctx, enrich)
+            sources = [top] + list(enrich)
+
     # クエリ起点のときは「1クエリ + GitHub実データ接地」に絞る。
     # 接地できないクエリは創作記事になるため書かず、使用済みにしてRSS素材へフォールバック。
-    if sources and sources[0]["url"].startswith("gsc://"):
+    if network_prompt is None and sources and sources[0]["url"].startswith("gsc://"):
         top = sources[0]
         query = top["title"].replace("検索クエリ「", "").split("」")[0]
         enrich = _enrich_query(conn, tick_id, query)
@@ -286,7 +372,7 @@ def generate(cfg: dict, conn, tick_id: int) -> dict | None:
                              {"reason": "no_groundable_sources"})
                 return None
 
-    prompt = build_prompt(cfg, sources)
+    prompt = network_prompt or build_prompt(cfg, sources)
     raw = _llm(cfg["create"]["generator"], cfg.get("agent_cli", ""), prompt,
                ollama_api=cfg["create"].get("ollama_api", DEFAULT_OLLAMA))
     parsed = parse_output(raw)

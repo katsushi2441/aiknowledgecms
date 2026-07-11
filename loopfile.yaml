@@ -12,7 +12,24 @@ cadence:
   act: weekly         # Phase 3
 
 # SENSE: 有効なセンサ
-sensors: [http_health, simpletrack, gsc, kurage_clicks]
+sensors: [http_health, simpletrack, gsc, gsc_network, kurage_clicks]
+
+# gsc_network: 全プロパティ横断の「検索流入が伸びているクエリ+受けページ」検知。
+# oss.phpのOfficeCLI流入増を人間が目視で見つけて記事化指示した流れの自動化
+# (2026-07-11)。伸びたクエリは記事化(解説+受けページへ送客)の題材になる。
+gsc_network:
+  properties:
+    - https://aiknowledgecms.exbridge.jp/
+    - https://kurage.exbridge.jp/
+    - https://aixec.exbridge.jp/
+  min_clicks: 2          # 直近7日クリックがこれ以上で
+  min_impressions: 40    # またはこれ以上の表示があり
+  rise_factor: 1.5       # 前週比この倍率以上に伸びていたら題材化
+  max_new_per_tick: 3
+
+# ACT (Phase 3): 課題キューの自動処置。未インデックス記事の再公開など。
+act:
+  treatments_per_day: 2
 
 # GSC(Search Console)センサ — 集客ループの心臓部。
 # credentials_file が無い間は自動スキップ。設定手順:
@@ -103,6 +120,7 @@ thresholds:
   pv_drop_pct: 30        # 前tick比でこの%以上PVが落ちたらissue
   slow_page_ms: 4000     # 応答がこれより遅いページはissue
   gsc_clicks_drop_pct: 20  # GSCクリック28d合計が24h前比この%以上減でissue (Phase 4)
+  reject_rate_pct: 70    # 48hの生成却下率がこの%以上(試行4回以上)でissue (Phase 3)
 
 # DISTRIBUTE
 publisher:

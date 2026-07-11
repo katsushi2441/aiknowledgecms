@@ -53,6 +53,12 @@ def generate(cfg: dict, conn, tick_id: int) -> dict:
     issues_resolved = conn.execute(
         "SELECT COUNT(*) FROM issues WHERE status='resolved'"
         " AND updated_at >= date('now','-7 day')").fetchone()[0]
+    acts_done = conn.execute(
+        "SELECT COUNT(*) FROM observations WHERE sensor='act'"
+        " AND key LIKE 'act_%' AND key != 'act_error'"
+        " AND created_at >= date('now','-7 day')").fetchone()[0]
+    open_issue_titles = [r["title"] for r in conn.execute(
+        "SELECT title FROM issues WHERE status='open' ORDER BY id DESC LIMIT 5")]
     gsc_imp = conn.execute(
         "SELECT value FROM observations WHERE key='gsc_impressions_28d'"
         " ORDER BY id DESC LIMIT 1").fetchone()
@@ -83,7 +89,8 @@ def generate(cfg: dict, conn, tick_id: int) -> dict:
 - 実行tick数(7日間): {ticks}
 - 公開した記事: {published}本
 - 品質ゲートで却下したドラフト: {rejected}本 (却下理由は台帳に記録)
-- 開いた課題: {issues_opened} / 解決した課題: {issues_resolved}
+- 開いた課題: {issues_opened} / 解決した課題: {issues_resolved} / 自動処置(ACT): {acts_done}件
+- 未解決の課題: {chr(10) + chr(10).join('  - ' + t for t in open_issue_titles) if open_issue_titles else 'なし'}
 
 ### 次に狙う検索クエリ (GSC opportunity)
 

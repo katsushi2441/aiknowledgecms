@@ -24,7 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from core import loopfile, state
-from adapters.sensors import gsc, http_health, kurage_clicks, simpletrack
+from adapters.sensors import gsc, gsc_network, http_health, kurage_clicks, simpletrack
 from adapters.collectors import rss
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +35,7 @@ SENSORS = {
     "http_health": http_health,
     "simpletrack": simpletrack,
     "gsc": gsc,
+    "gsc_network": gsc_network,
     "kurage_clicks": kurage_clicks,
 }
 
@@ -120,8 +121,92 @@ def triage(cfg: dict, conn, tick_id: int, sensed: dict) -> dict:
             if row["fingerprint"] not in dropped_fps:
                 _resolve(row["fingerprint"])
 
+    # --- 成長ルール(2026-07-11追加): インフラ監視だけでなくループ自身の
+    #     生産品質と検索での立ち位置を課題化する ---
+
+    # (1) 生成の却下率: 直近48時間で試行4回以上かつ却下率が閾値超えの記事種は
+    #     生成プロンプトかゲートに問題がある(digestで31却下/17公開の実績あり)
+    reject_th = float(th.get("reject_rate_pct", 70)) / 100.0
+    for kind, rej_key, pub_key in [("article", "article_rejected", "article_published"),
+                                   ("digest", "digest_rejected", "digest_published"),
+                                   ("insight", "insight_rejected", "insight_published")]:
+        cnt = {k: conn.execute(
+            "SELECT COUNT(*) FROM observations WHERE key=?"
+            " AND created_at >= datetime('now', 'localtime', '-2 days')", (k,)
+        ).fetchone()[0] for k in (rej_key, pub_key)}
+        attempts = cnt[rej_key] + cnt[pub_key]
+        fp = f"reject_rate_high:{kind}"
+        if attempts >= 4 and cnt[rej_key] / attempts >= reject_th:
+            _open(fp, "warning",
+                  f"{kind}の却下率が高い: 48hで{cnt[rej_key]}/{attempts}回却下 — "
+                  f"生成プロンプトかゲート基準の見直しが必要",
+                  json.dumps(cnt, ensure_ascii=False))
+        else:
+            _resolve(fp)
+
+    # (2) 未インデックス記事: URL検査の最新値が「未インデックス」の公開3日超の記事。
+    #     ACTが再公開(lastmod更新+内部リンク網の張り直し)で処置する
+    idx_latest = {}
+    for row in conn.execute(
+            "SELECT key, value FROM observations WHERE key LIKE 'idx_state:%'"
+            " ORDER BY id"):
+        idx_latest[row["key"][len("idx_state:"):]] = row["value"]
+    for slug, indexed in idx_latest.items():
+        pub = conn.execute(
+            "SELECT 1 FROM content WHERE slug=? AND status='published'"
+            " AND published_at <= datetime('now', 'localtime', '-3 days')",
+            (slug,)).fetchone()
+        fp = f"not_indexed:{slug}"
+        if pub and not indexed:
+            _open(fp, "warning",
+                  f"未インデックス: /articles/{slug}.html がGoogleに載っていない",
+                  json.dumps({"slug": slug}))
+        elif indexed:
+            _resolve(fp)
+
     conn.commit()
     return {"opened": opened, "resolved": resolved}
+
+
+# ---------------------------------------------------------------- act
+def act(cfg: dict, conn, tick_id: int, dry_run: bool) -> dict:
+    """Phase 3: 課題キューの自動処置。1日の処置予算内で消化する。
+
+    処置できる課題タイプだけを扱い、それ以外(却下率・ページ死活など
+    人間かプロンプト改修が必要なもの)はキューに残して週次レポートで晒す。
+    """
+    budget = int(cfg.get("act", {}).get("treatments_per_day", 2))
+    today = state.now()[:10]
+    done_today = conn.execute(
+        "SELECT COUNT(*) FROM observations WHERE sensor='act'"
+        " AND created_at LIKE ?", (today + "%",)).fetchone()[0]
+    treated: list[str] = []
+    for issue in state.open_issues(conn):
+        if done_today + len(treated) >= budget:
+            break
+        fp = issue["fingerprint"]
+        if fp.startswith("not_indexed:"):
+            slug = fp.split(":", 1)[1]
+            # 同じ記事への再公開処置は7日に1回まで
+            recent = conn.execute(
+                "SELECT 1 FROM observations WHERE sensor='act' AND key=?"
+                " AND created_at >= datetime('now', 'localtime', '-7 days')",
+                (f"act_republish:{slug}",)).fetchone()
+            if recent or dry_run:
+                continue
+            try:
+                from adapters.publishers import articles_ftp
+                url = articles_ftp.republish_one(cfg, conn, slug)
+            except Exception:
+                traceback.print_exc()
+                state.record(conn, tick_id, "act", "act_error", 1,
+                             {"issue": fp, "error": traceback.format_exc()[-300:]})
+                continue
+            if url:
+                state.record(conn, tick_id, "act", f"act_republish:{slug}", 1,
+                             {"issue": fp, "url": url})
+                treated.append(fp)
+    return {"treated": treated}
 
 
 # ---------------------------------------------------------------- create
@@ -655,6 +740,15 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
     # TRIAGE
     triaged = triage(cfg, conn, tick_id, sensed)
     print(f"  TRIAGE: opened={len(triaged['opened'])} resolved={len(triaged['resolved'])}")
+
+    # ACT (Phase 3): 課題キューの自動処置(失敗してもtickは完走)
+    try:
+        acted = act(cfg, conn, tick_id, dry_run)
+        if acted["treated"]:
+            print(f"  ACT: treated {acted['treated']}")
+    except Exception:
+        print("  ACT: FAILED")
+        traceback.print_exc()
 
     # CREATE → ゲート → DISTRIBUTE (失敗してもtickは完走させる)
     try:
