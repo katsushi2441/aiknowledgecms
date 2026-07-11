@@ -28,8 +28,11 @@ gsc_network:
   max_new_per_tick: 3
 
 # ACT (Phase 3): 課題キューの自動処置。未インデックス記事の再公開など。
+# 2026-07-12: 未インデックス課題の検知(毎tick3記事巡回)が処置予算(2/日)を
+# 上回るペースで積み上がった(バックログ15件)ため5/日に増やす。republishは
+# FTP2アップロードのみで軽く、7日クールダウンもあるため安全側。
 act:
-  treatments_per_day: 2
+  treatments_per_day: 5
 
 # GSC(Search Console)センサ — 集客ループの心臓部。
 # credentials_file が無い間は自動スキップ。設定手順:

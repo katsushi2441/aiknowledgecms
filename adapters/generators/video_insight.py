@@ -97,11 +97,15 @@ def generate(cfg: dict, conn, tick_id: int, dcfg_by_name: dict) -> dict | None:
 
     if "## 参考" not in parsed["body"] and "##参考" not in parsed["body"]:
         parsed["body"] = parsed["body"].rstrip() + f"\n\n## 参考\n- {video_url}\n"
+    # ゲートのURL許可リストは本文が実際に引用するURL(ref付きtracked_url)で
+    # 判定する必要がある。生URLだけを許可リストに入れると本文中のtracked_url
+    # が「素材にないURL」として毎回却下される(officecli記事と同型のバグ)。
+    src_urls = [video_url] if video_url != video["url"] else [video["url"]]
     conn.execute(
         "INSERT INTO content (slug, title, status, body_md, sources, created_tick, created_at)"
         " VALUES (?, ?, 'draft', ?, ?, ?, ?)",
         (slug, parsed["title"][:120], parsed["body"],
-         json.dumps([video["url"]], ensure_ascii=False), tick_id, state.now()))
+         json.dumps(src_urls, ensure_ascii=False), tick_id, state.now()))
     conn.commit()
     return {"slug": slug, "title": parsed["title"], "body": parsed["body"],
-            "sources": [video["url"]], "source_ids": [video["id"]]}
+            "sources": src_urls, "source_ids": [video["id"]]}
