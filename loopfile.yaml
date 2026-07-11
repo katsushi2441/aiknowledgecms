@@ -41,8 +41,8 @@ research:
 
 # CREATE: 記事生成(日次・予算内)
 create:
-  articles_per_day: 1
-  max_attempts_per_day: 2      # ゲート不合格時の再試行込み上限
+  articles_per_day: 2          # 2026-07-11: GSCオポチュニティ起点の解説記事を厚くするため1→2に増枠
+  max_attempts_per_day: 4      # ゲート不合格時の再試行込み上限(枠増に合わせ2→4)
   video_insight_per_day: 3     # Kurage動画1本ずつを深掘りする単独記事(digestとは別予算)
   video_insight_max_attempts_per_day: 6
   ollama_api: http://192.168.0.3:11434
