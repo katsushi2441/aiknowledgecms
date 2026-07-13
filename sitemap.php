@@ -51,16 +51,23 @@ if ($article_files !== false) {
 }
 /* =========================
    キーワードページ
+   2026-07-14: 全量(9,000件超)を載せるのをやめ、直近500件に制限。
+   sitemap全体が11,212 URLに膨張し、その81%が動的キーワードページで、
+   新規記事(/articles/)へのクロールバジェットが薄まっていた
+   (未インデックス記事21件滞留の一因)。ページ自体は残る:
+   sitemapで宣伝しなくなるだけ。
 ========================= */
 $keyword_file = __DIR__."/keyword.json";
 if(file_exists($keyword_file)){
     $data = json_decode(file_get_contents($keyword_file), true);
     if(isset($data["keywords"])){
-        foreach($data["keywords"] as $kw => $v){
+        $kw_all = array_keys($data["keywords"]);
+        $kw_recent = array_slice($kw_all, -500);   // 追記順を前提に末尾=新しい方を採用
+        foreach($kw_recent as $kw){
             $url = $base_url."/aiknowledgecms.php?kw=".urlencode($kw);
             echo '<url>';
             echo '<loc>'.$url.'</loc>';
-            echo '<priority>0.8</priority>';
+            echo '<priority>0.5</priority>';
             echo '</url>';
         }
     }

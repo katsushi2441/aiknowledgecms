@@ -1144,6 +1144,9 @@ if ($view_keyword !== "") {
 <?php /* 最新Kurage動画ウィジェット(AIKnowledgeCMS Loopが毎tick生成・送客計測ref=akc-w付き) */
 @include __DIR__ . '/kurage_videos.html'; ?>
 
+<?php /* 最新AI解説記事ウィジェット(Loopが毎tick生成。/articles/への内部リンク導線 2026-07-14) */
+@include __DIR__ . '/media_articles.html'; ?>
+
 <div class="content-shell">
 <main class="content-main">
 

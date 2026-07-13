@@ -832,6 +832,14 @@ def run_tick(cfg: dict, dry_run: bool, force_create: bool = False) -> int:
         except Exception:
             print("  WIDGET: FAILED")
             traceback.print_exc()
+        try:
+            from adapters.publishers import articles_widget
+            aw_path = articles_widget.publish(cfg, conn)
+            if aw_path:
+                print(f"  ARTICLES-WIDGET updated: {aw_path}")
+        except Exception:
+            print("  ARTICLES-WIDGET: FAILED")
+            traceback.print_exc()
         if escalate(cfg, triaged["opened"]):
             print("  ESCALATE: email sent")
     else:

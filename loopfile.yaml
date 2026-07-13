@@ -63,8 +63,11 @@ research:
 create:
   articles_per_day: 2          # 2026-07-11: GSCオポチュニティ起点の解説記事を厚くするため1→2に増枠
   max_attempts_per_day: 4      # ゲート不合格時の再試行込み上限(枠増に合わせ2→4)
-  video_insight_per_day: 3     # Kurage動画1本ずつを深掘りする単独記事(digestとは別予算)
-  video_insight_max_attempts_per_day: 6
+  # 2026-07-14: 3→1に減枠。insight記事の題材が動画由来でサイトテーマ(AIエージェント経済)
+  # から外れがち(車・交通系IC・芸能など)、未インデックスのまま滞留していた。
+  # 本数よりテーマの一貫性(トピックオーソリティ)を優先する。
+  video_insight_per_day: 1
+  video_insight_max_attempts_per_day: 2
   ollama_api: http://192.168.0.3:11434
   generator:
     kind: ollama               # ollama / cli (agent_cliを使用)
@@ -87,7 +90,10 @@ digests:
     api: http://127.0.0.1:18303/jobs?limit=50   # 多い日は30本/日追加されるため多めに巡回
     public_base: "https://kurage.exbridge.jp/kuragev.php?id="
     link_ref: akc     # 記事内の動画リンクに ?ref=akc を付けて送客を計測する
-    per_day: 3        # 1記事=最大10本 × 最大3記事/日 = 30本/日まで消化
+    # 2026-07-14: 3→1に減枠。送客実測でダイジェスト記事経由は0〜1クリック/日、
+    # ウィジェット経由が16〜66クリック/日と、送客はウィジェットが担っており、
+    # 記事群は未インデックスの薄いリンク集としてサイト品質を下げるだけだった。
+    per_day: 1
     max_items: 10
   - name: youtube
     kind: youtube_rss
