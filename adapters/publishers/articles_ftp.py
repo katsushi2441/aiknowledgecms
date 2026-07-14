@@ -43,7 +43,7 @@ ul{{padding-left:22px}}
 </style></head><body><div class="wrap">
 <div class="nav"><a href="index.html">← Media 一覧</a><a href="/aiknowledgecms.html">AIKnowledgeCMS</a></div>
 <div class="card">
-<span class="badge">🤖 この記事はエージェントループが自動生成し、検証ゲートを通過して公開されました</span>
+<span class="badge">{badge}</span>
 {body}
 <div class="meta" style="margin-top:26px">published: {published} / gate: creator={creator} → verifier={verifier}</div>
 </div>
@@ -89,8 +89,12 @@ def _related_articles(conn, slug: str, title: str, k: int = 4) -> list:
     return [(s, t) for _, s, t in scored[:k]]
 
 
+DEFAULT_BADGE = "🤖 この記事はエージェントループが自動生成し、検証ゲートを通過して公開されました"
+
+
 def render_article(cfg: dict, conn, slug: str, title: str, body_md: str,
-                   published: str, creator: str, verifier: str) -> str:
+                   published: str, creator: str, verifier: str,
+                   badge: str | None = None) -> str:
     """記事HTMLを組み立てる(新規公開・一括再公開の共通経路)。"""
     site = cfg["site"].rstrip("/")
     article_url = f"{site}/articles/{slug}.html"
@@ -118,6 +122,7 @@ def render_article(cfg: dict, conn, slug: str, title: str, body_md: str,
         title=html.escape(title), desc=desc, body=body_html,
         published=published, creator=creator, verifier=verifier,
         url=article_url, og_image_url=og_image_url, json_ld=json_ld,
+        badge=html.escape(badge) if badge else DEFAULT_BADGE,
     )
 
 
@@ -143,8 +148,9 @@ def publish(cfg: dict, conn, draft: dict, gate: dict) -> str:
     page = render_article(
         cfg, conn, draft["slug"], draft["title"], draft["body"],
         published=state.now(),
-        creator=cfg["create"]["generator"]["model"],
+        creator=draft.get("creator") or cfg["create"]["generator"]["model"],
         verifier=(gate.get("verifier") or {}).get("model", "-"),
+        badge=draft.get("badge"),
     )
     og_image_bytes = generate_og_image(draft["title"])
 
